@@ -1,144 +1,34 @@
-# Hera Nest
+# hera-nest
 
-**Advanced DXF Nesting Application**
+A minimal Electron application with TypeScript
 
-Desktop application for intelligent 2D nesting with DXF support, built on Electron.
+## Recommended IDE Setup
 
----
+- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
 
-## Overview
+## Project Setup
 
-Hera Nest is a desktop nesting application forked from [Kenzap Nesting](https://github.com/kenzap/nesting-app), evolving in a new direction with enhanced features and workflows tailored for advanced manufacturing needs.
-
-### Key Features
-
-- **DXF Import/Export** — Full DXF support with multi-layer preservation
-- **Intelligent Nesting** — State-of-the-art 2D nesting algorithm via [Sparrow](https://github.com/JeroenGar/sparrow)
-- **Multi-Shape Detection** — Automatic detection of individual shapes within complex DXF files
-- **Live Preview** — Real-time visualization as nesting algorithm optimizes
-- **Sheet & Strip Modes** — Configurable output for different material types
-- **Engraving Support** — Preserve and layout internal geometry
-- **Cross-Platform** — macOS, Windows, Linux
-
----
-
-## Installation
-
-### From Source
+### Install
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/hera-nest.git
-cd hera-nest
-
-# Install dependencies
-bun install
-
-# Run in development mode
-bun run dev
-
-# Build for production
-bun run dist:mac    # macOS (DMG + ZIP)
-bun run dist:win    # Windows (NSIS installer)
-bun run dist:snap   # Linux (Snap)
+$ npm install
 ```
 
-### Requirements
+### Development
 
-- Node.js (latest LTS recommended)
-- Bun (latest version recommended)
-- Native nesting binaries (included in `native/` directory)
-
----
-
-## Development
-
-### Project Structure
-
-```
-hera-nest/
-├── main/           # Electron main process
-├── renderer/       # UI and visualization layer
-├── preload.js      # Secure IPC bridge
-├── shared/         # Shared constants and utilities
-├── native/         # Platform-specific Sparrow binaries
-├── assets/         # Icons and resources
-└── docs/           # Documentation
+```bash
+$ npm run dev
 ```
 
-### Available Scripts
+### Build
 
-- `bun start` — Launch application
-- `bun run dev` — Launch with DevTools enabled
-- `bun run dist:mac` — Build macOS DMG + ZIP
-- `bun run dist:win` — Build Windows installer
-- `bun run dist:win-portable` — Build Windows portable
-- `bun run dist:snap` — Build Linux Snap
-- `bun run dist:appx` — Build Windows AppX (Microsoft Store)
+```bash
+# For windows
+$ npm run build:win
 
-### Architecture
+# For macOS
+$ npm run build:mac
 
-Hera Nest follows Electron's multi-process architecture:
-
-- **Main Process** (`main/`) — System integration, file operations, algorithm orchestration
-- **Renderer Process** (`renderer/`) — UI rendering, canvas visualization, user interaction
-- **Preload Script** (`preload.js`) — Secure IPC bridge with context isolation
-
----
-
-## Technology Stack
-
-- **Electron** — Cross-platform desktop framework
-- **Sparrow** — Native nesting engine (Rust-based)
-- **DXF Parser** — DXF file parsing and generation
-- **Canvas API** — 2D rendering and visualization
-- **JSTS** — Computational geometry operations
-
-### Key Dependencies
-
-- `@flatten-js/core` — 2D geometry primitives
-- `@tarikjabiri/dxf` — DXF writing
-- `dxf-parser` — DXF parsing
-- `jsts` — Geometry operations
-- `planar-face-discovery` — Shape detection
-- `concaveman` — Concave hull computation
-
----
-
-## Roadmap
-
-Hera Nest is evolving beyond the original Kenzap Nesting with focus on:
-
-- [ ] Enhanced material management and sheet inventory
-- [ ] Advanced nesting strategies with priority rules
-- [ ] Batch processing and job queue management
-- [ ] CNC machine integration and G-code generation
-- [ ] Cloud synchronization and collaboration features
-- [ ] Performance optimizations for large part libraries
-- [ ] Extended file format support (SVG, AI, PDF)
-- [ ] Advanced reporting and material utilization analytics
-
----
-
-## Contributing
-
-This is a personal fork with different goals from the original project. Contributions are welcome, but please open an issue first to discuss proposed changes.
-
----
-
-## Credits
-
-Hera Nest is forked from [Kenzap Nesting](https://github.com/kenzap/nesting-app) by Kenzap Pte Ltd.
-
-The nesting algorithm is powered by [Sparrow](https://github.com/JeroenGar/sparrow).
-
-Research foundation: [Computational Geometry for Nesting](https://arxiv.org/abs/2509.13329)
-
----
-
-## License
-
-Licensed under **Apache License 2.0**. See [LICENSE](LICENSE) for full text.
-
-Original work Copyright © Kenzap Pte Ltd  
-Modified work Copyright © 2026 Thanh Loi
+# For Linux
+$ npm run build:linux
+```
