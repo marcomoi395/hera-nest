@@ -1,42 +1,61 @@
-appId: com.electron.app
-productName: hera-nest
+appId: com.kenzap.nesting
+productName: Kenzap Nesting
 directories:
-  buildResources: build
+  buildResources: resources
+  output: dist-electron
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - out/**/*
+  - resources/**/*
+  - package.json
 asarUnpack:
   - resources/**
 win:
-  executableName: hera-nest
+  extraResources:
+    - from: native/windows
+      to: native/windows
+      filter:
+        - '**/*'
+  icon: resources/icon-square.ico
+  target:
+    - nsis
+    - portable
+  artifactName: '${productName}-${version}-${arch}.${ext}'
+mac:
+  extendInfo:
+    ElectronTeamID: BY6WQ9N45R
+    ITSAppUsesNonExemptEncryption: false
+  minimumSystemVersion: '12.0.0'
+  extraFiles:
+    - from: native/macos/bin
+      to: Helpers
+      filter:
+        - sparrow
+  binaries:
+    - Contents/Helpers/sparrow
+  icon: resources/icon-square.icns
+  target:
+    - dmg
+    - zip
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: '${productName}-${version}-setup.${ext}'
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-mac:
-  entitlementsInherit: build/entitlements.mac.plist
-  extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
-dmg:
-  artifactName: ${name}-${version}.${ext}
 linux:
+  extraResources:
+    - from: native/linux
+      to: native/linux
+      filter:
+        - '**/*'
+  icon: resources/icon-square.png
   target:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: Kenzap Pte Ltd
   category: Utility
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: '${name}-${version}.${ext}'
 npmRebuild: false
 publish:
   provider: generic
