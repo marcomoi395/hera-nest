@@ -101,7 +101,7 @@ Start the Electron app as usual:
 
 ```bash
 cd /Users/pavel/Extensions/nesting-app
-npm start
+bun start
 ```
 
 Then inspect the binaries from the renderer with:

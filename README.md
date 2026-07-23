@@ -32,21 +32,21 @@ git clone https://github.com/yourusername/hera-nest.git
 cd hera-nest
 
 # Install dependencies
-npm install
+bun install
 
 # Run in development mode
-npm run dev
+bun run dev
 
 # Build for production
-npm run dist:mac    # macOS (DMG + ZIP)
-npm run dist:win    # Windows (NSIS installer)
-npm run dist:snap   # Linux (Snap)
+bun run dist:mac    # macOS (DMG + ZIP)
+bun run dist:win    # Windows (NSIS installer)
+bun run dist:snap   # Linux (Snap)
 ```
 
 ### Requirements
 
 - Node.js (latest LTS recommended)
-- npm or yarn
+- Bun (latest version recommended)
 - Native nesting binaries (included in `native/` directory)
 
 ---
@@ -68,13 +68,13 @@ hera-nest/
 
 ### Available Scripts
 
-- `npm start` — Launch application
-- `npm run dev` — Launch with DevTools enabled
-- `npm run dist:mac` — Build macOS DMG + ZIP
-- `npm run dist:win` — Build Windows installer
-- `npm run dist:win-portable` — Build Windows portable
-- `npm run dist:snap` — Build Linux Snap
-- `npm run dist:appx` — Build Windows AppX (Microsoft Store)
+- `bun start` — Launch application
+- `bun run dev` — Launch with DevTools enabled
+- `bun run dist:mac` — Build macOS DMG + ZIP
+- `bun run dist:win` — Build Windows installer
+- `bun run dist:win-portable` — Build Windows portable
+- `bun run dist:snap` — Build Linux Snap
+- `bun run dist:appx` — Build Windows AppX (Microsoft Store)
 
 ### Architecture
 
