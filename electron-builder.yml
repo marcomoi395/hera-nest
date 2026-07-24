@@ -1,0 +1,64 @@
+appId: com.kenzap.nesting
+productName: Kenzap Nesting
+directories:
+  buildResources: resources
+  output: dist-electron
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+asarUnpack:
+  - resources/**
+win:
+  extraResources:
+    - from: native/windows
+      to: native/windows
+      filter:
+        - '**/*'
+  icon: resources/icon-square.ico
+  target:
+    - nsis
+    - portable
+  artifactName: '${productName}-${version}-${arch}.${ext}'
+mac:
+  extendInfo:
+    ElectronTeamID: BY6WQ9N45R
+    ITSAppUsesNonExemptEncryption: false
+  minimumSystemVersion: '12.0.0'
+  extraFiles:
+    - from: native/macos/bin
+      to: Helpers
+      filter:
+        - sparrow
+  binaries:
+    - Contents/Helpers/sparrow
+  icon: resources/icon-square.icns
+  target:
+    - dmg
+    - zip
+nsis:
+  artifactName: '${productName}-${version}-setup.${ext}'
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+linux:
+  extraResources:
+    - from: native/linux
+      to: native/linux
+      filter:
+        - '**/*'
+  icon: resources/icon-square.png
+  target:
+    - AppImage
+    - snap
+    - deb
+  maintainer: Kenzap Pte Ltd
+  category: Utility
+appImage:
+  artifactName: '${name}-${version}.${ext}'
+npmRebuild: false
+publish:
+  provider: generic
+  url: https://example.com/auto-updates
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/

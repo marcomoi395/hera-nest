@@ -1,0 +1,1 @@
+export const DEFAULT_ENGRAVING_COLOR = '#4488FF'
