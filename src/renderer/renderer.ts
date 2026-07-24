@@ -422,18 +422,6 @@ function handleDroppedDataTransfer(dt: DataTransfer): boolean {
   return true
 }
 
-function bindExplicitListScroll(listEl: HTMLElement | null): void {
-  if (!listEl) return
-  listEl.addEventListener(
-    'wheel',
-    (e) => {
-      if (listEl.scrollHeight <= listEl.clientHeight) return
-      e.preventDefault()
-      listEl.scrollTop += e.deltaY
-    },
-    { passive: false }
-  )
-}
 
 function bindDragAndDrop(): void {
   if (!dom.dropZone || !dom.canvasArea) return
@@ -553,8 +541,6 @@ export async function initializeRenderer(): Promise<void> {
   bindFeedbackBanner()
   bindDragAndDrop()
   bindOverlayClose()
-  bindExplicitListScroll(dom.fileList)
-  bindExplicitListScroll(dom.sheetList)
   customSelectsApi?.enhanceModalSelects?.()
   linuxAppMenuApi?.bind?.()
 
