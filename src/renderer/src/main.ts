@@ -30,6 +30,9 @@ import {
 } from '../services/dxf-engraving-preview-service'
 import { buildSketchGroups, extractPolygonForEntities } from '../services/dxf-flatten-service'
 import { detectContour } from '../services/contour-detection-service'
+import { createDxfShapeDetectionService } from '../services/dxf-shape-detection-service'
+import { createDxfRasterEnvelopeService } from '../services/dxf-raster-envelope-service'
+import { createDxfShapeStructureService } from '../services/dxf-shape-structure-service'
 import { initializeRenderer } from '../renderer'
 
 window.Flatten = Flatten
@@ -59,6 +62,22 @@ window.NestDxfContourDetectionService = { detectContour }
 
 
 console.log('[MAIN.TS] Script loaded, readyState:', document.readyState)
+window.NestDxfShapeDetectionService = createDxfShapeDetectionService({
+  geometry: window.NestDxfGeometry,
+  svg: window.NestDxfSvg,
+  concaveman: window.concaveman
+})
+window.NestDxfRasterEnvelopeService = createDxfRasterEnvelopeService({
+  geometry: window.NestDxfGeometry,
+  shapeDetectionService: window.NestDxfShapeDetectionService
+})
+window.NestDxfShapeStructureService = createDxfShapeStructureService({
+  geometry: window.NestDxfGeometry,
+  flattenService: window.NestDxfFlattenService,
+  shapeDetectionService: window.NestDxfShapeDetectionService,
+  rasterEnvelopeService: window.NestDxfRasterEnvelopeService
+})
+
 console.log('[MAIN.TS] Checking for DOM elements...')
 console.log('[MAIN.TS] dropZone:', document.getElementById('dropZone'))
 console.log('[MAIN.TS] addSheetBtn:', document.getElementById('addSheetBtn'))
