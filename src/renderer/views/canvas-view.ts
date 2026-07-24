@@ -425,6 +425,7 @@ export function createCanvasView(deps: {
     dom.fitView?.addEventListener('click', () => { state.zoom = 1; applyZoom(true) })
 
     let viewportDrag: any = null
+    let rafId: number | null = null
     dom.viewport?.addEventListener('mousedown', (e: MouseEvent) => {
       if (e.button !== 0) return
       viewportDrag = {
@@ -438,8 +439,13 @@ export function createCanvasView(deps: {
 
     window.addEventListener('mousemove', e => {
       if (!viewportDrag || !dom.viewport) return
-      dom.viewport.scrollLeft = viewportDrag.scrollLeft - (e.clientX - viewportDrag.startX)
-      dom.viewport.scrollTop = viewportDrag.scrollTop - (e.clientY - viewportDrag.startY)
+      if (rafId) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        if (!viewportDrag || !dom.viewport) return
+        dom.viewport.scrollLeft = viewportDrag.scrollLeft - (e.clientX - viewportDrag.startX)
+        dom.viewport.scrollTop = viewportDrag.scrollTop - (e.clientY - viewportDrag.startY)
+      })
     })
 
     window.addEventListener('mouseup', () => {
