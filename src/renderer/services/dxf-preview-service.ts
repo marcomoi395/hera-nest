@@ -1,3 +1,5 @@
+import { clonePreviewData, applyPartLabelsToPreviewData, clonePreviewShape } from '../utils/dxf-preview-state'
+
 export function createDxfPreviewService(deps: {
   state: any
   getCurrentNestingSettings: () => any
@@ -24,7 +26,6 @@ export function createDxfPreviewService(deps: {
     detectContour: () => null,
   }
   const { serializeEntityForExport } = (window as any).NestDxfExportMetadataService || {}
-  const { clonePreviewData, applyPartLabelsToPreviewData, clonePreviewShape } = (window as any).NestDxfPreviewState || {}
   const {
     normalizeSettings,
     SKETCH_CONTOUR_METHODS = [],
