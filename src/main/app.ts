@@ -238,7 +238,7 @@ function createWindow({
   }
 
   if (!minimalStartup) {
-    windowOptions.webPreferences!.preload = path.join(__dirname, '..', '..', 'preload', 'index.js')
+    windowOptions.webPreferences!.preload = path.join(__dirname, '..', 'preload', 'index.js')
   }
 
   if (process.platform === 'darwin' && !minimalStartup) {
