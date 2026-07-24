@@ -260,7 +260,7 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
         }))
 
         const result = await window.electronAPI.exportSheetsDXF({
-          outputPath: exportFolderPath!,
+          outputDir: exportFolderPath!,
           outputDirBookmark: exportFolderBookmark || null,
           jobName: state.nestResult.name || 'nesting-job',
           inputPath: state.nestInputPath || null,
