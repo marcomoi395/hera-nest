@@ -209,13 +209,13 @@ export function createLinuxAppMenu() {
       document.removeEventListener('pointerdown', onOutsidePointer, true)
       document.removeEventListener('keydown', onKeydown, true)
       window.removeEventListener('resize', closeOpenMenu, true)
-      window.removeEventListener('scroll', closeOpenMenu, true)
+      window.removeEventListener('scroll', closeOpenMenu, { capture: true })
     }
 
     document.addEventListener('pointerdown', onOutsidePointer, true)
     document.addEventListener('keydown', onKeydown, true)
     window.addEventListener('resize', closeOpenMenu, true)
-    window.addEventListener('scroll', closeOpenMenu, true)
+    window.addEventListener('scroll', closeOpenMenu, { capture: true, passive: true })
 
     openMenuState = { menu, button, cleanup }
   }

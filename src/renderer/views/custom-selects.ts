@@ -119,7 +119,7 @@ export function createModalCustomSelects() {
         document.removeEventListener('pointerdown', handleOutsidePointer, true)
         document.removeEventListener('keydown', handleKeydown, true)
         window.removeEventListener('resize', close, true)
-        window.removeEventListener('scroll', close, true)
+        window.removeEventListener('scroll', close, { capture: true })
         if (openController?.close === close) openController = null
       }
 
@@ -139,7 +139,7 @@ export function createModalCustomSelects() {
       document.addEventListener('pointerdown', handleOutsidePointer, true)
       document.addEventListener('keydown', handleKeydown, true)
       window.addEventListener('resize', close, true)
-      window.addEventListener('scroll', close, true)
+      window.addEventListener('scroll', close, { capture: true, passive: true })
       openController = { close }
     }
 
