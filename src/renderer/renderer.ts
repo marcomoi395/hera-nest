@@ -1,4 +1,5 @@
 import { state, schedulePersistJobState, hydrateJobState } from './state/store'
+import { DEFAULT_ENGRAVING_COLOR } from '../shared/constants'
 import * as NestHelpers from './helpers'
 import { createDxfService } from './services/dxf-service'
 import { createCanvasView } from './views/canvas-view'
@@ -86,7 +87,7 @@ const dom = {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const { DEFAULT_ENGRAVING_COLOR } = window.NestConstants
+// Imported from ../shared/constants instead of window.NestConstants
 const { partLabelFromName } = NestHelpers
 const FEEDBACK_BANNER_STORAGE_KEY = 'kenzap.feedback-banner.dismissedAt.v2'
 const FEEDBACK_BANNER_FIRST_SEEN_KEY = 'kenzap.feedback-banner.firstSeenAt.v1'
