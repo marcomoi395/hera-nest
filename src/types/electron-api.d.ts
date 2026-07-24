@@ -88,8 +88,7 @@ export interface SparrowPollResult {
 export interface ExportPayload {
   sheets: unknown[]
   settings: unknown
-  outputPath: string
-  outputDir?: string
+  outputDir: string
   outputDirBookmark?: string | null
   jobName?: string
   inputPath?: string | null
