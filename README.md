@@ -2,22 +2,18 @@
 
 A minimal Electron application with TypeScript
 
-## Recommended IDE Setup
-
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
-
 ## Project Setup
 
 ### Install
 
 ```bash
-$ bun install
+bun install
 ```
 
 ### Development
 
 ```bash
-$ bun run dev
+bun run dev
 ```
 
 ### Build
