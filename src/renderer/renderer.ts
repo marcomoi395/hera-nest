@@ -89,9 +89,9 @@ const dom = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 // Imported from ../shared/constants instead of window.NestConstants
 const { partLabelFromName } = NestHelpers
-const FEEDBACK_BANNER_STORAGE_KEY = 'kenzap.feedback-banner.dismissedAt.v2'
-const FEEDBACK_BANNER_FIRST_SEEN_KEY = 'kenzap.feedback-banner.firstSeenAt.v1'
-const FEEDBACK_SUPPORT_URL = 'https://kenzap.com/nesting-support/'
+const FEEDBACK_BANNER_STORAGE_KEY = 'heranest.feedback-banner.dismissedAt.v2'
+const FEEDBACK_BANNER_FIRST_SEEN_KEY = 'heranest.feedback-banner.firstSeenAt.v1'
+const FEEDBACK_SUPPORT_URL = 'https://github.com/marcomoi395/hera-nest/issues'
 const FEEDBACK_BANNER_COOLDOWN_MS = 60 * 24 * 60 * 60 * 1000
 const FEEDBACK_BANNER_FIRST_SHOW_DELAY_MS = 14 * 24 * 60 * 60 * 1000
 

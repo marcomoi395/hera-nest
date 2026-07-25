@@ -3,13 +3,13 @@ import path from 'path'
 import packageJson from '../../package.json'
 import type { AppMetaResult } from '../types/electron-api'
 
-const productName = (packageJson as any).productName || 'Kenzap Nesting'
+const productName = (packageJson as { productName?: string }).productName || 'Hera Nest'
 const appDescription = packageJson.description || 'DXF nesting application'
-const WEBSITE_URL = 'https://kenzap.com/nesting/'
-const SUPPORT_URL = 'https://kenzap.com/nesting-support/'
-const RELEASES_URL = 'https://github.com/kenzap/nesting-app/releases'
-const REDDIT_URL = 'https://www.reddit.com/r/kenzap/'
-const LINKEDIN_URL = 'https://www.linkedin.com/company/kenzap'
+const WEBSITE_URL = 'https://github.com/marcomoi395/hera-nest'
+const SUPPORT_URL = 'https://github.com/marcomoi395/hera-nest/issues'
+const RELEASES_URL = 'https://github.com/marcomoi395/hera-nest/releases'
+const REDDIT_URL = ''
+const LINKEDIN_URL = ''
 
 let mainWindow: BrowserWindow | null = null
 let appMenuIpcRegistered = false
@@ -20,7 +20,7 @@ function configureAppMetadata(): void {
     applicationName: productName,
     applicationVersion: packageJson.version,
     version: packageJson.version,
-    copyright: 'Copyright © Kenzap Pte Ltd',
+    copyright: 'Copyright © 2026 Thanh Loi',
     credits: `${appDescription}\n\nDXF nesting desktop application with live preview and production DXF export.\n\nAll nesting and preprocessing run locally using bundled helper executables. The app does not download code at runtime, does not require network access for core functionality, and terminates helper processes when quitting.`
   })
 }

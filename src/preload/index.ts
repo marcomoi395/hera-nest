@@ -1,13 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
-const PRODUCT_NAME = 'Kenzap Nesting'
+const PRODUCT_NAME = 'Hera Nest'
 const APP_DESCRIPTION =
   'DXF nesting desktop application with live preview and production DXF export.'
-const WEBSITE_URL = 'https://kenzap.com/nesting/'
-const SUPPORT_URL = 'https://kenzap.com/nesting-support/'
-const RELEASES_URL = 'https://github.com/kenzap/nesting-app/releases'
-const REDDIT_URL = 'https://www.reddit.com/r/kenzap/'
-const LINKEDIN_URL = 'https://www.linkedin.com/company/kenzap'
+const WEBSITE_URL = 'https://github.com/marcomoi395/hera-nest'
+const SUPPORT_URL = 'https://github.com/marcomoi395/hera-nest/issues'
+const RELEASES_URL = 'https://github.com/marcomoi395/hera-nest/releases'
+const REDDIT_URL = ''
+const LINKEDIN_URL = ''
 
 contextBridge.exposeInMainWorld('electronAPI', {
   openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),

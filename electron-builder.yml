@@ -1,5 +1,5 @@
-appId: com.kenzap.nesting
-productName: Kenzap Nesting
+appId: com.heranest.app
+productName: Hera Nest
 directories:
   buildResources: resources
   output: dist-electron
@@ -52,7 +52,7 @@ linux:
     - AppImage
     - snap
     - deb
-  maintainer: Kenzap Pte Ltd
+  maintainer: Thanh Loi
   category: Utility
 appImage:
   artifactName: '${name}-${version}.${ext}'
