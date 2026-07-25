@@ -1,18 +1,18 @@
 export function createLinuxAppMenu() {
   const isLinux = document.body.classList.contains('platform-linux')
   const HELP_URLS: any = {
-    supportUrl: 'https://kenzap.com/nesting-support/',
-    releasesUrl: 'https://github.com/kenzap/nesting-app/releases',
-    redditUrl: 'https://www.reddit.com/r/kenzap/',
-    linkedInUrl: 'https://www.linkedin.com/company/kenzap',
-    websiteUrl: 'https://kenzap.com/nesting/',
+    supportUrl: 'https://github.com/marcomoi395/hera-nest/issues',
+    releasesUrl: 'https://github.com/marcomoi395/hera-nest/releases',
+    // redditUrl: 'https://www.reddit.com/r/kenzap/',
+    // linkedInUrl: 'https://www.linkedin.com/company/kenzap',
+    websiteUrl: 'https://github.com/marcomoi395/hera-nest',
   }
 
   const MENUS: Record<string, any[]> = {
     app: [
-      { label: 'About Kenzap Nesting', action: 'about', type: 'local' },
+      { label: 'About Hera Nest', action: 'about', type: 'local' },
       { type: 'separator' },
-      { label: 'Exit Kenzap Nesting', action: 'quit', type: 'ipc' },
+      { label: 'Exit Hera Nest', action: 'quit', type: 'ipc' },
     ],
     window: [
       { label: 'Minimize', action: 'minimize-window', type: 'ipc' },
@@ -24,13 +24,13 @@ export function createLinuxAppMenu() {
       { label: 'Release Notes', action: 'releasesUrl', type: 'url' },
       { label: 'Reddit Community', action: 'redditUrl', type: 'url' },
       { label: 'LinkedIn', action: 'linkedInUrl', type: 'url' },
-      { label: 'Kenzap Nesting Website', action: 'websiteUrl', type: 'url' },
+      { label: 'Hera Nest Website', action: 'websiteUrl', type: 'url' },
     ],
   }
 
   let openMenuState: any = null
   let appMeta: any = {
-    productName: 'Kenzap Nesting',
+    productName: 'Hera Nest',
     description: 'DXF nesting desktop application with live preview and production DXF export.',
     version: '',
     ...HELP_URLS,
@@ -60,7 +60,7 @@ export function createLinuxAppMenu() {
       <div class="linux-about-name"></div>
       <div class="linux-about-version"></div>
       <div class="linux-about-description"></div>
-      <div class="linux-about-copy">Copyright © Kenzap Pte Ltd</div>
+      <div class="linux-about-copy">Copyright © 2026 Thanh Loi</div>
       <div class="linux-about-actions">
         <button type="button" class="linux-about-btn" data-about-link="websiteUrl">Website</button>
         <button type="button" class="linux-about-btn" data-about-link="supportUrl">Support</button>
@@ -101,7 +101,7 @@ export function createLinuxAppMenu() {
 
   function updateAboutDialog() {
     const dialog = ensureAboutDialog().dialog
-    if (dialog.querySelector('.linux-about-name')) dialog.querySelector('.linux-about-name').textContent = appMeta.productName || 'Kenzap Nesting'
+    if (dialog.querySelector('.linux-about-name')) dialog.querySelector('.linux-about-name').textContent = appMeta.productName || 'Hera Nest'
     if (dialog.querySelector('.linux-about-version')) dialog.querySelector('.linux-about-version').textContent = appMeta.version ? `Version ${appMeta.version}` : ''
     if (dialog.querySelector('.linux-about-description')) dialog.querySelector('.linux-about-description').textContent =
       appMeta.description || 'DXF nesting desktop application with live preview and production DXF export.'
