@@ -2,12 +2,48 @@ import { createDxfPreviewService } from '../services/dxf-preview-service'
 import { createDxfPreviewCanvasView, DEFAULT_CANVAS_W } from './dxf-preview-canvas'
 import { createDxfPreviewShapesListView } from './dxf-preview-shapes-list'
 
+interface PreviewState {
+  fileId: string | null
+  filename: string
+  shapes: Array<{
+    id: string
+    layer?: string
+    ownerLayers?: string[]
+    visible: boolean
+    qty?: number
+  }>
+  layers: Array<{ name: string; color?: string }>
+  activeLayer: string | null
+  selectedId: string | null
+  positions: unknown[]
+  zoom: number
+  panelVisible: boolean
+  canvasWidth: number
+}
+
+interface WindowWithNestingAPI extends Window {
+  getCurrentNestingSettings?: () => unknown
+  renderFiles?: () => void
+  schedulePersistJobState?: () => void
+  getPartLabelConfig?: (layers: unknown[]) => unknown
+  removeJobFileById?: (fileId: string) => boolean
+  openDXFPreview?: (fileId: string) => Promise<void>
+  refreshDXFPreview?: () => Promise<void>
+}
+
+export interface DxfPreviewModalApi {
+  pv: PreviewState
+  openDXFPreview: (fileId: string) => Promise<void>
+  closeDXFPreview: () => void
+  refreshDXFPreview: () => Promise<void>
+}
+
 export function createDxfPreviewModal(deps: {
-  state: any
-}) {
+  state: { files: unknown[]; settings?: unknown }
+}): DxfPreviewModalApi {
   const { state } = deps
 
-  const pv: any = {
+  const pv: PreviewState = {
     fileId: null,
     filename: '',
     shapes: [],
@@ -17,7 +53,7 @@ export function createDxfPreviewModal(deps: {
     positions: [],
     zoom: 1,
     panelVisible: true,
-    canvasWidth: DEFAULT_CANVAS_W,
+    canvasWidth: DEFAULT_CANVAS_W
   }
 
   const dom = {
@@ -32,49 +68,62 @@ export function createDxfPreviewModal(deps: {
     fileMeta: document.getElementById('pvFileMeta'),
     shapeCount: document.getElementById('pvShapeCount'),
     stats: document.getElementById('pvStats'),
-    zoomIn: document.getElementById('pvZoomIn'),
-    zoomOut: document.getElementById('pvZoomOut'),
     zoomFit: document.getElementById('pvZoomFit'),
     zoomLabel: document.getElementById('pvZoomLabel'),
+    zoomIn: document.getElementById('pvZoomIn'),
+    zoomOut: document.getElementById('pvZoomOut'),
     togglePanel: document.getElementById('pvTogglePanel'),
     removeShape: document.getElementById('pvRemoveShape') as HTMLButtonElement | null,
     removeShapeLabel: document.getElementById('pvRemoveShapeLabel'),
     removePart: document.getElementById('pvRemovePart'),
-    panel: document.querySelector('.pvw-shapes-panel'),
+    panel: document.querySelector('.pvw-shapes-panel')
   }
 
   const previewService = createDxfPreviewService({
     state,
-    getCurrentNestingSettings: () => (window as any).getCurrentNestingSettings?.() || state.settings || {},
-    renderFiles: () => (window as any).renderFiles?.(),
-    schedulePersistJobState: () => (window as any).schedulePersistJobState?.(),
+    getCurrentNestingSettings: () => {
+      const result =
+        (window as WindowWithNestingAPI).getCurrentNestingSettings?.() || state.settings || {}
+      return result as Record<string, unknown>
+    },
+    renderFiles: () => (window as WindowWithNestingAPI).renderFiles?.(),
+    schedulePersistJobState: () => (window as WindowWithNestingAPI).schedulePersistJobState?.()
   })
 
   const canvasView = createDxfPreviewCanvasView({
-    pv,
+    pv: pv as any,
     getCanvasWrap: () => dom.canvasWrap,
-    getLayerConfig: () => (typeof (window as any).getPartLabelConfig === 'function' ? (window as any).getPartLabelConfig(pv.layers) : { enabled: false, color: '#4488FF', style: 'stroked' }),
+    getLayerConfig: () => {
+      const win = window as WindowWithNestingAPI
+      const result = win.getPartLabelConfig?.(pv.layers) || {
+        enabled: false,
+        color: '#4488FF',
+        style: 'stroked'
+      }
+      return result as { enabled: boolean; color: string; style: string }
+    }
   })
 
-  function syncActions() {
-    const selected = pv.shapes.find((shape: any) => shape.id === pv.selectedId)
+  function syncActions(): void {
+    const selected = pv.shapes.find((shape) => shape.id === pv.selectedId)
     if (dom.removeShape) dom.removeShape.disabled = !selected
-    if (dom.removeShapeLabel) dom.removeShapeLabel.textContent = selected?.visible === false ? 'Restore' : 'Remove'
+    if (dom.removeShapeLabel)
+      dom.removeShapeLabel.textContent = selected?.visible === false ? 'Restore' : 'Remove'
   }
 
   const shapesListView = createDxfPreviewShapesListView({
-    pv,
+    pv: pv as any,
     getShapesList: () => dom.shapesList,
     getShapeCount: () => dom.shapeCount,
     getFileMeta: () => dom.fileMeta,
     getStats: () => dom.stats,
-    syncActions,
+    syncActions
   })
 
-  function renderTabs() {
+  function renderTabs(): void {
     if (!dom.layerTabs) return
     dom.layerTabs.innerHTML = ''
-    const makeTab = (label: string, dot: string, layerName: string | null) => {
+    const makeTab = (label: string, dot: string, layerName: string | null): HTMLButtonElement => {
       const active = pv.activeLayer === layerName
       const button = document.createElement('button')
       button.className = `pvw-tab${active ? ' active' : ''}`
@@ -87,31 +136,33 @@ export function createDxfPreviewModal(deps: {
       return button
     }
     dom.layerTabs.appendChild(makeTab('All', 'var(--text-muted)', null))
-    pv.layers.forEach((layer: any) => {
-      const count = pv.shapes.filter((shape: any) => (shape.ownerLayers || [shape.layer]).includes(layer.name) && shape.visible).length
-      const button = makeTab(layer.name, layer.color, layer.name)
+    pv.layers.forEach((layer) => {
+      const count = pv.shapes.filter(
+        (shape) => (shape.ownerLayers || [shape.layer]).includes(layer.name) && shape.visible
+      ).length
+      const button = makeTab(layer.name, layer.color || '#808080', layer.name)
       const badge = document.createElement('span')
       badge.className = 'pvw-tab-count'
       badge.textContent = String(count)
       button.appendChild(badge)
-    if (dom.layerTabs) dom.layerTabs.appendChild(button)
+      if (dom.layerTabs) dom.layerTabs.appendChild(button)
     })
   }
 
-  function renderSVG() {
+  function renderSVG(): void {
     canvasView.renderSVG(selectShape)
   }
 
-  function renderList() {
+  function renderList(): void {
     shapesListView.renderList({
       onSelectShape: selectShape,
       onChangeQty: changeQty,
       onSetQty: setQty,
-      onRestoreShape: restoreShape,
+      onRestoreShape: restoreShape
     })
   }
 
-  function selectShape(id: string) {
+  function selectShape(id: string): void {
     pv.selectedId = pv.selectedId === id ? null : id
     renderSVG()
     renderList()
@@ -121,16 +172,16 @@ export function createDxfPreviewModal(deps: {
     }
   }
 
-  function changeQty(id: string, delta: number) {
-    const shape = pv.shapes.find((entry: any) => entry.id === id)
+  function changeQty(id: string, delta: number): void {
+    const shape = pv.shapes.find((entry) => entry.id === id)
     if (shape) {
-      shape.qty = Math.max(1, shape.qty + delta)
+      shape.qty = Math.max(1, (shape.qty || 1) + delta)
       renderList()
     }
   }
 
-  function setQty(id: string, value: string) {
-    const shape = pv.shapes.find((entry: any) => entry.id === id)
+  function setQty(id: string, value: string): void {
+    const shape = pv.shapes.find((entry) => entry.id === id)
     if (!shape) return
     const parsed = Number.parseInt(String(value), 10)
     if (!Number.isFinite(parsed) || parsed < 1) {
@@ -141,8 +192,8 @@ export function createDxfPreviewModal(deps: {
     renderList()
   }
 
-  function deleteShape(id: string) {
-    const shape = pv.shapes.find((entry: any) => entry.id === id)
+  function deleteShape(id: string): void {
+    const shape = pv.shapes.find((entry) => entry.id === id)
     if (!shape) return
     shape.visible = false
     pv.selectedId = id
@@ -151,8 +202,8 @@ export function createDxfPreviewModal(deps: {
     renderTabs()
   }
 
-  function restoreShape(id: string) {
-    const shape = pv.shapes.find((entry: any) => entry.id === id)
+  function restoreShape(id: string): void {
+    const shape = pv.shapes.find((entry) => entry.id === id)
     if (!shape) return
     shape.visible = true
     pv.selectedId = id
@@ -161,13 +212,15 @@ export function createDxfPreviewModal(deps: {
     renderTabs()
   }
 
-  function setZoom(nextZoom: number) {
+  function setZoom(nextZoom: number): void {
     pv.zoom = Math.max(0.25, Math.min(5, nextZoom))
     if (dom.zoomLabel) dom.zoomLabel.textContent = `${Math.round(pv.zoom * 100)}%`
     canvasView.applyZoomTransform()
   }
 
-  async function openDXFPreview(fileId: string, filename: string) {
+  async function openDXFPreview(fileId: string): Promise<void> {
+    const file = (state.files as any[]).find((f: any) => f.id === fileId)
+    const filename = file?.name || 'Unknown'
     pv.fileId = fileId
     pv.filename = filename
     pv.zoom = 1
@@ -190,23 +243,25 @@ export function createDxfPreviewModal(deps: {
     if (dom.fileMeta) dom.fileMeta.textContent = 'Loading…'
     dom.modal?.classList.add('open')
 
-    const { data, source } = await previewService.preparePreviewData({ state, fileId, filename })
-    pv.shapes = data.shapes
-    pv.layers = data.layers
+    const result = await previewService.preparePreviewData({ state, fileId, filename })
+    if (!result) return
+    pv.shapes = (result as any).shapes || []
+    pv.layers = (result as any).layers || []
     pv.canvasWidth = canvasView.getCanvasWidth()
     pv.positions = canvasView.autoLayout(pv.shapes, pv.canvasWidth)
-    const hint = source === 'mock' ? '  · preview' : ''
-    if (dom.fileMeta) dom.fileMeta.textContent = `${pv.shapes.length} shape${pv.shapes.length !== 1 ? 's' : ''} · ${pv.layers.length} layer${pv.layers.length !== 1 ? 's' : ''}${hint}`
+    const hint = (result as any).source === 'mock' ? '  · preview' : ''
+    if (dom.fileMeta)
+      dom.fileMeta.textContent = `${pv.shapes.length} shape${pv.shapes.length !== 1 ? 's' : ''} · ${pv.layers.length} layer${pv.layers.length !== 1 ? 's' : ''}${hint}`
     renderTabs()
     renderSVG()
     renderList()
   }
 
-  function closeDXFPreview() {
+  function closeDXFPreview(): void {
     dom.modal?.classList.remove('open')
   }
 
-  async function refreshDXFPreview() {
+  async function refreshDXFPreview(): Promise<void> {
     if (!dom.modal?.classList.contains('open')) return
     if (!pv.fileId) {
       renderSVG()
@@ -214,7 +269,7 @@ export function createDxfPreviewModal(deps: {
       return
     }
     try {
-      await openDXFPreview(pv.fileId, pv.filename)
+      await openDXFPreview(pv.fileId)
     } catch (error) {
       console.error('[DXF Preview] Failed to refresh preview:', error)
     }
@@ -222,27 +277,32 @@ export function createDxfPreviewModal(deps: {
 
   dom.removeShape?.addEventListener('click', () => {
     if (!pv.selectedId) return
-    const selected = pv.shapes.find((shape: any) => shape.id === pv.selectedId)
+    const selected = pv.shapes.find((shape) => shape.id === pv.selectedId)
     if (!selected) return
     if (selected.visible === false) restoreShape(pv.selectedId)
     else deleteShape(pv.selectedId)
   })
 
   dom.removePart?.addEventListener('click', () => {
-    if (!pv.fileId || typeof (window as any).removeJobFileById !== 'function') return
-    const removed = (window as any).removeJobFileById(pv.fileId)
-    if (removed && typeof (window as any).schedulePersistJobState === 'function') (window as any).schedulePersistJobState()
+    const win = window as WindowWithNestingAPI
+    if (!pv.fileId || typeof win.removeJobFileById !== 'function') return
+    const removed = win.removeJobFileById(pv.fileId)
+    if (removed && typeof win.schedulePersistJobState === 'function') win.schedulePersistJobState()
     if (removed) closeDXFPreview()
   })
 
   dom.zoomIn?.addEventListener('click', () => setZoom(pv.zoom + 0.25))
   dom.zoomOut?.addEventListener('click', () => setZoom(pv.zoom - 0.25))
   dom.zoomFit?.addEventListener('click', () => setZoom(1))
-  dom.canvasWrap?.addEventListener('wheel', (event: WheelEvent) => {
-    if (!event.ctrlKey && !event.metaKey) return
-    event.preventDefault()
-    setZoom(pv.zoom + (event.deltaY < 0 ? 0.1 : -0.1))
-  }, { passive: false })
+  dom.canvasWrap?.addEventListener(
+    'wheel',
+    (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return
+      event.preventDefault()
+      setZoom(pv.zoom + (event.deltaY < 0 ? 0.1 : -0.1))
+    },
+    { passive: false }
+  )
 
   dom.togglePanel?.addEventListener('click', () => {
     pv.panelVisible = !pv.panelVisible
@@ -256,7 +316,7 @@ export function createDxfPreviewModal(deps: {
     renderSVG()
   })
 
-  window.addEventListener('keydown', event => {
+  window.addEventListener('keydown', (event) => {
     if (!dom.modal?.classList.contains('open')) return
     if (!pv.selectedId) return
     if (event.key !== 'Delete' && event.key !== 'Backspace') return
@@ -268,27 +328,28 @@ export function createDxfPreviewModal(deps: {
 
   dom.close?.addEventListener('click', closeDXFPreview)
   dom.cancel?.addEventListener('click', closeDXFPreview)
-  dom.modal?.addEventListener('click', event => {
+  dom.modal?.addEventListener('click', (event) => {
     if (event.target === dom.modal) closeDXFPreview()
   })
 
   dom.apply?.addEventListener('click', () => {
     previewService.applyPreviewToFile({
       state,
-      fileId: pv.fileId,
+      fileId: pv.fileId!,
       shapes: pv.shapes,
-      layers: pv.layers,
+      layers: pv.layers
     })
     closeDXFPreview()
   })
 
-  ;(window as any).openDXFPreview = openDXFPreview
-  ;(window as any).refreshDXFPreview = refreshDXFPreview
+  const win = window as WindowWithNestingAPI
+  win.openDXFPreview = openDXFPreview
+  win.refreshDXFPreview = refreshDXFPreview
 
   return {
     pv,
     openDXFPreview,
     closeDXFPreview,
-    refreshDXFPreview,
+    refreshDXFPreview
   }
 }

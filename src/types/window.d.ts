@@ -1,6 +1,6 @@
-import type { Point, Polygon } from './geometry'
+import type { Point } from './geometry-types'
 import type { ElectronAPI } from './electron-api'
-import type { SettingsObject, MultiSheetStrategyConfig, LayoutConfig } from './settings'
+import type { SettingsObject, MultiSheetStrategyConfig } from './settings'
 
 export interface NestConstants {
   DEFAULT_ENGRAVING_COLOR: string
@@ -55,25 +55,25 @@ declare global {
     NestSettings: NestSettings
     NestEngravingLayout: NestEngravingLayout
     NestHelpers: NestHelpers
-    Flatten: any
-    jsts: any
+    Flatten: unknown
+    jsts: unknown
     concaveman: (points: Point[], concavity?: number, lengthThreshold?: number) => Point[]
-    NestDxfColor: any
-    NestDxfGeometry: any
-    NestDxfSvg: any
-    NestDxfLayerService: any
-    NestDxfExportMetadataService: any
-    NestDxfEngravingPreviewService: any
-    NestDxfShapeDetectionService: any
-    NestDxfContourDetectionJstsService: any
-    NestDxfContourDetectionService: any
-    NestDxfShapeStructureService: any
-    NestDxfRasterEnvelopeService: any
-    NestDxfFlattenService: any
-    NestDxfContourHelpers: any
-    NestDxfPreviewState: any
-    NestResultScoring: any
-    NestTailRefinement: any
+    NestDxfColor: unknown
+    NestDxfGeometry: unknown
+    NestDxfSvg: unknown
+    NestDxfLayerService: unknown
+    NestDxfExportMetadataService: unknown
+    NestDxfEngravingPreviewService: unknown
+    NestDxfShapeDetectionService: unknown
+    NestDxfContourDetectionJstsService: unknown
+    NestDxfContourDetectionService: unknown
+    NestDxfShapeStructureService: unknown
+    NestDxfRasterEnvelopeService: unknown
+    NestDxfFlattenService: unknown
+    NestDxfContourHelpers: unknown
+    NestDxfPreviewState: unknown
+    NestResultScoring: unknown
+    NestTailRefinement: unknown
     parseDXFToShapes?: (data: unknown, raw: unknown, settings: SettingsObject) => unknown
   }
 }

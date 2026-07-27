@@ -1,3 +1,79 @@
+import type {
+  Point,
+  DxfEntityType,
+  SplineEntity,
+  DxfLayer,
+  DxfShape,
+  DxfFile,
+  DxfHole
+} from '../../types/dxf-types'
+import type { SettingsObject } from '../../types/settings'
+import type { AppState } from '../state/store'
+
+interface DxfSheet {
+  id: string
+  width: number
+  height: number
+  widthMode?: string
+  material?: string
+}
+
+interface DxfServiceDeps {
+  state: AppState
+  getCurrentNestingSettings: () => SettingsObject
+}
+
+interface ShapeGeometry {
+  origin: Point
+  outer: Point[]
+  holes: Point[][]
+}
+
+interface PlacementItem {
+  id: number
+  demand: number
+  dxf: string
+  allowed_orientations: number[]
+  shape: {
+    type: string
+    data: [number, number][]
+  }
+}
+
+interface PlacementSheet {
+  id: string
+  width: number | null
+  height: number
+  width_mode: string
+  quantity: string
+  material: string
+}
+
+interface ExportItem {
+  source_file: string
+  source_name: string
+  source_shape_id: string
+  part_label: string
+  layers: DxfLayer[]
+  entities: DxfEntityType[]
+  polygon: [number, number][]
+  holes: [number, number][][]
+}
+
+interface PlacementPayload {
+  name: string
+  settings: SettingsObject
+  items: PlacementItem[]
+  sheets: PlacementSheet[]
+  strip_height: number
+}
+
+interface ExportResult {
+  payload: PlacementPayload
+  path: string
+  directory?: string
+}
+
 import { FALLBACK_PALETTE } from './dxf-layer-service'
 import {
   buildAllowedOrientations,
@@ -9,17 +85,31 @@ import {
   roundCoord,
   sameExportPoint
 } from '../helpers'
-import type { SettingsObject } from '../../types/settings'
 
-export function createDxfService({ state, getCurrentNestingSettings }: any) {
-  function engravingLayerIndex(settings: SettingsObject = getCurrentNestingSettings()) {
+export interface DxfServiceApi {
+  ensureFileShapes: (file: DxfFile) => Promise<DxfShape[]>
+  hydrateFileShapesForList: (file: DxfFile, cb: () => void) => void
+  buildPlacementPayload: () => Promise<PlacementPayload>
+  exportPlacementJSON: () => Promise<ExportResult>
+}
+
+export function createDxfService({
+  state,
+  getCurrentNestingSettings
+}: DxfServiceDeps): DxfServiceApi {
+  function engravingLayerIndex(
+    settings: SettingsObject = getCurrentNestingSettings()
+  ): number | null {
     const raw = settings?.engravingLayer
     if (raw === 'off' || String(raw) === 'false' || raw == null || raw === '') return null
     const parsed = Number.parseInt(String(raw), 10)
     return Number.isFinite(parsed) && parsed >= 1 ? parsed : 2
   }
 
-  function batchLayerTemplateAtIndex(targetIndex: number, excludeFileId: string | null = null) {
+  function batchLayerTemplateAtIndex(
+    targetIndex: number,
+    excludeFileId: string | null = null
+  ): DxfLayer | null {
     if (!Number.isFinite(targetIndex) || targetIndex < 1) return null
     for (const file of state.files || []) {
       if (excludeFileId && file?.id === excludeFileId) continue
@@ -30,10 +120,10 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
   }
 
   function synthesizeEngravingLayer(
-    layers: any[],
+    layers: DxfLayer[],
     settings: SettingsObject = getCurrentNestingSettings(),
     excludeFileId: string | null = null
-  ) {
+  ): DxfLayer[] {
     const targetIndex = engravingLayerIndex(settings)
     const sourceLayers = Array.isArray(layers) ? layers.map((layer) => ({ ...layer })) : []
     if (targetIndex === null) return sourceLayers
@@ -50,7 +140,7 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
     return sourceLayers.filter(Boolean)
   }
 
-  async function ensureFileShapes(file: any) {
+  async function ensureFileShapes(file: DxfFile): Promise<DxfShape[]> {
     const settings = getCurrentNestingSettings()
     const matchesSketchMode = file._multiSketchDetection === !!settings.multiSketchDetection
     const sketchContourMethod = String(settings?.sketchContourMethod || 'auto')
@@ -58,7 +148,8 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
       String(file?._sketchContourMethod || 'auto') === sketchContourMethod
     const hasUsableShapes = Array.isArray(file.shapes) && file.shapes.length
     const hasExportMetadata =
-      hasUsableShapes && file.shapes.every((shape: any) => Array.isArray(shape.exportEntities))
+      hasUsableShapes &&
+      file.shapes!.every((shape: DxfShape) => Array.isArray(shape.exportEntities))
     const hasLayerTable = Array.isArray(file.layers) && file.layers.length
     if (
       matchesSketchMode &&
@@ -67,7 +158,7 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
       hasExportMetadata &&
       hasLayerTable
     )
-      return file.shapes
+      return file.shapes!
     if (
       !file.path ||
       !window.electronAPI?.parseDXF ||
@@ -81,12 +172,15 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
       throw new Error(result?.error || `Failed to parse ${file.name}`)
     }
 
-    const parsed = window.parseDXFToShapes(result.data, result.raw, settings) as any
+    const parsed = window.parseDXFToShapes(result.data, result.raw, settings) as {
+      shapes: DxfShape[]
+      layers: DxfLayer[]
+    }
     if (!parsed?.shapes?.length) {
       throw new Error(`No nestable shapes found in ${file.name}`)
     }
 
-    file.shapes = parsed.shapes.map((shape: any) => ({
+    file.shapes = parsed.shapes.map((shape: DxfShape) => ({
       ...shape,
       qty: file.qty || shape.qty || 1
     }))
@@ -97,23 +191,29 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
     return file.shapes
   }
 
-  async function hydrateFileShapesForList(file: any, onHydrated: (f: any) => void) {
+  async function hydrateFileShapesForList(
+    file: DxfFile,
+    onHydrated: (f: DxfFile) => void
+  ): Promise<void> {
     if (!file || !file.path || (Array.isArray(file.shapes) && file.shapes.length)) return
     if (!window.electronAPI?.parseDXF || typeof window.parseDXFToShapes !== 'function') return
 
     try {
       await ensureFileShapes(file)
       if (typeof onHydrated === 'function') onHydrated(file)
-    } catch (error: any) {
-      console.warn(`[DXF] Failed to pre-parse ${file.name}:`, error.message)
+    } catch (error: unknown) {
+      console.warn(
+        `[DXF] Failed to pre-parse ${file.name}:`,
+        error instanceof Error ? error.message : String(error)
+      )
     }
   }
-  function stripClosingPoint(points: any[]) {
+  function stripClosingPoint(points: Point[]): Point[] {
     if (!Array.isArray(points) || points.length < 2) return Array.isArray(points) ? [...points] : []
     return sameExportPoint(points[0], points[points.length - 1]) ? points.slice(0, -1) : [...points]
   }
 
-  function isCollinearPoint(prev: any, point: any, next: any) {
+  function isCollinearPoint(prev: Point, point: Point, next: Point): boolean {
     if (!prev || !point || !next) return false
     const abx = point.x - prev.x
     const aby = point.y - prev.y
@@ -125,7 +225,7 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
     return dot <= 1e-8
   }
 
-  function dropCollinearPoints(points: any[]) {
+  function dropCollinearPoints(points: Point[]): Point[] {
     if (!Array.isArray(points) || points.length < 4) return Array.isArray(points) ? [...points] : []
     const filtered = points.filter(
       (point, index, all) =>
@@ -138,7 +238,7 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
     return filtered.length >= 3 ? filtered : points
   }
 
-  function cleanSolverRing(points: any[]) {
+  function cleanSolverRing(points: Point[]): Point[] {
     const sanitized = sanitizePolygonPoints(points)
     if (sanitized.length < 3) return []
     const openRing = stripClosingPoint(sanitized)
@@ -146,13 +246,13 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
     return dropCollinearPoints(openRing)
   }
 
-  function normalizeSolverRing(points: any[], origin: any) {
+  function normalizeSolverRing(points: Point[], origin: Point): Point[] {
     return points.map((point) => ({
       x: roundCoord(point.x - origin.x),
       y: roundCoord(point.y - origin.y)
     }))
   }
-  function normalizeExportPoint(point: any, origin: any) {
+  function normalizeExportPoint(point: Point, origin: Point): Point {
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return point
     return {
       ...point,
@@ -161,7 +261,8 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
     }
   }
 
-  function normalizeExportEntity(entity: any, origin: any) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function normalizeExportEntity(entity: any, origin: Point): DxfEntityType {
     if (!entity || !origin) return entity
     return {
       ...entity,
@@ -169,18 +270,21 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
       end: normalizeExportPoint(entity.end, origin),
       center: normalizeExportPoint(entity.center, origin),
       vertices: Array.isArray(entity.vertices)
-        ? entity.vertices.map((vertex: any) => normalizeExportPoint(vertex, origin))
+        ? entity.vertices.map((vertex: Point) => normalizeExportPoint(vertex, origin))
         : entity.vertices,
       fitPoints: Array.isArray(entity.fitPoints)
-        ? entity.fitPoints.map((point: any) => normalizeExportPoint(point, origin))
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (entity as any).fitPoints.map((point: Point) => normalizeExportPoint(point, origin))
         : entity.fitPoints,
       controlPoints: Array.isArray(entity.controlPoints)
-        ? entity.controlPoints.map((point: any) => normalizeExportPoint(point, origin))
+        ? (entity as SplineEntity).controlPoints.map((point: Point) =>
+            normalizeExportPoint(point, origin)
+          )
         : entity.controlPoints
     }
   }
 
-  function buildSolverShapeGeometry(shape: any) {
+  function buildSolverShapeGeometry(shape: DxfShape): ShapeGeometry | null {
     const outer = cleanSolverRing(shape?.polygonPoints)
     if (outer.length < 3) return null
     const origin = outer.reduce(
@@ -194,15 +298,15 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
       origin,
       outer: normalizeSolverRing(outer, origin),
       holes: (shape?.holes || [])
-        .map((hole: any) => cleanSolverRing(hole?.points || []))
-        .filter((hole: any) => hole.length >= 3)
-        .map((hole: any) => normalizeSolverRing(hole, origin))
+        .map((hole: DxfHole) => cleanSolverRing(hole?.points || []))
+        .filter((hole: Point[]) => hole.length >= 3)
+        .map((hole: Point[]) => normalizeSolverRing(hole, origin))
     }
   }
 
-  async function buildPlacementPayload() {
-    const items: any[] = []
-    const exportItems: Record<string, any> = {}
+  async function buildPlacementPayload(): Promise<PlacementPayload> {
+    const items: PlacementItem[] = []
+    const exportItems: Record<string, ExportItem> = {}
     let nextId = 0
     const settings = getCurrentNestingSettings()
     const allowedOrientations = buildAllowedOrientations(settings.rotationStep)
@@ -213,20 +317,22 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
     }
 
     for (const file of state.files) {
-      const shapes = (await ensureFileShapes(file)).filter((shape: any) => shape.visible !== false)
-      shapes.forEach((shape: any) => {
+      const shapes = (await ensureFileShapes(file)).filter(
+        (shape: DxfShape) => shape.visible !== false
+      )
+      shapes.forEach((shape: DxfShape) => {
         const geometry = buildSolverShapeGeometry(shape)
         if (!geometry?.outer?.length) return
         const itemId = nextId++
 
         items.push({
           id: itemId,
-          demand: Math.max(1, parseInt(shape.qty || 1, 10)),
+          demand: Math.max(1, parseInt(String(shape.qty || 1), 10)),
           dxf: file.path || file.name,
           allowed_orientations: [...allowedOrientations],
           shape: {
             type: 'simple_polygon',
-            data: geometry.outer.map((point: any) => [point.x, point.y])
+            data: geometry.outer.map((point: Point) => [point.x, point.y] as [number, number])
           }
         })
 
@@ -237,13 +343,15 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
           part_label: partLabelFromName(file.name),
           layers: clonePlain(synthesizeEngravingLayer(file.layers || [], settings, file.id)),
           entities: clonePlain(
-            (shape.exportEntities || []).map((entity: any) =>
+            (shape.exportEntities || []).map((entity: DxfEntityType) =>
               normalizeExportEntity(entity, geometry.origin)
             )
           ),
-          polygon: geometry.outer.map((point: any) => [point.x, point.y]),
+          polygon: geometry.outer.map((point: Point) => [point.x, point.y] as [number, number]),
           holes: clonePlain(
-            geometry.holes.map((hole: any) => hole.map((point: any) => [point.x, point.y]))
+            geometry.holes.map((hole: Point[]) =>
+              hole.map((point: Point) => [point.x, point.y] as [number, number])
+            )
           )
         }
       })
@@ -253,13 +361,13 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
       throw new Error('No exportable shapes available')
     }
 
-    state.lastPlacementExportItems = exportItems
+    state.lastPlacementExportItems = exportItems as any
 
     return {
       name: buildJobName(state.files),
       settings,
       items,
-      sheets: state.sheets.map((sheet: any) => ({
+      sheets: (state.sheets as any).map((sheet: DxfSheet) => ({
         id: sheet.id,
         width: sheet.widthMode === 'unlimited' ? null : sheet.width,
         height: sheet.height,
@@ -271,7 +379,7 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
     }
   }
 
-  async function exportPlacementJSON() {
+  async function exportPlacementJSON(): Promise<ExportResult> {
     const payload = await buildPlacementPayload()
     if (!window.electronAPI?.savePlacementJSON) {
       throw new Error('Placement JSON export is not available')
@@ -282,8 +390,12 @@ export function createDxfService({ state, getCurrentNestingSettings }: any) {
       throw new Error(result?.error || 'Failed to save placement JSON')
     }
 
-    state.lastExportPath = result.path
-    return { payload, path: result.path, directory: (result as any).directory }
+    state.lastExportPath = result.path ?? null
+    return {
+      payload,
+      path: result.path ?? '',
+      directory: (result as { directory?: string }).directory
+    }
   }
 
   return {

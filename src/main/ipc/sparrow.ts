@@ -1,75 +1,76 @@
-// @ts-nocheck
 /* eslint-disable */
-import { app, ipcMain } from 'electron';
-import path from 'path';
-import fs from 'fs';
-import { spawn } from 'child_process';
-import { cleanupTempArtifacts } from '../utils/temp-retention';
-import { compactLastStripArtifacts } from '../utils/compact-last-strip';
+import { app, ipcMain } from 'electron'
+import path from 'path'
+import fs from 'fs'
+import { spawn } from 'child_process'
+import { cleanupTempArtifacts } from '../utils/temp-retention'
+import { compactLastStripArtifacts } from '../utils/compact-last-strip'
 
-const activeSparrowProcesses = new Map();
-const sparrowRuns = new Map();
+const activeSparrowProcesses = new Map()
+const sparrowRuns = new Map()
 
 function isDevMode() {
-  return !app.isPackaged || process.argv.includes('--dev');
+  return !app.isPackaged || process.argv.includes('--dev')
 }
 
 function nativePlatformDir() {
   switch (process.platform) {
     case 'win32':
-      return 'windows';
+      return 'windows'
     case 'darwin':
-      return 'macos';
+      return 'macos'
     default:
-      return process.platform;
+      return process.platform
   }
 }
 
 function nativeExecutableName(baseName) {
-  return process.platform === 'win32' ? `${baseName}.exe` : baseName;
+  return process.platform === 'win32' ? `${baseName}.exe` : baseName
 }
 
 function nativeBaseDir() {
   if (app.isPackaged && process.platform === 'darwin') {
-    const helperDir = path.join(process.resourcesPath, '..', 'Helpers');
-    if (fs.existsSync(helperDir)) return helperDir;
+    const helperDir = path.join(process.resourcesPath, '..', 'Helpers')
+    if (fs.existsSync(helperDir)) return helperDir
   }
-  const relativeParts = ['native', nativePlatformDir(), 'bin'];
-  const packagedDir = path.join(process.resourcesPath, ...relativeParts);
-  if (app.isPackaged && fs.existsSync(packagedDir)) return packagedDir;
-  return path.join(__dirname, '..', '..', ...relativeParts);
+  const relativeParts = ['native', nativePlatformDir(), 'bin']
+  const packagedDir = path.join(process.resourcesPath, ...relativeParts)
+  if (app.isPackaged && fs.existsSync(packagedDir)) return packagedDir
+  return path.join(__dirname, '..', '..', ...relativeParts)
 }
 
 function resolveNativeExecutable(baseName) {
-  return path.join(nativeBaseDir(), nativeExecutableName(baseName));
+  return path.join(nativeBaseDir(), nativeExecutableName(baseName))
 }
 
 function shellQuote(value) {
-  const text = String(value ?? '');
-  if (process.platform === 'win32') return `"${text.replace(/"/g, '\\"')}"`;
-  return `'${text.replace(/'/g, `'\\''`)}'`;
+  const text = String(value ?? '')
+  if (process.platform === 'win32') return `"${text.replace(/"/g, '\\"')}"`
+  return `'${text.replace(/'/g, `'\\''`)}'`
 }
 
 function resolveSparrowCargoManifestPath() {
-  const repoRoot = path.join(__dirname, '..', '..');
+  const repoRoot = path.join(__dirname, '..', '..')
   const candidates = [
     process.env.SPARROW_CARGO_MANIFEST_PATH,
     process.env.NESTING_CARGO_MANIFEST_PATH,
-    path.join(repoRoot, '..', 'nesting', 'Cargo.toml'),
-  ].filter(Boolean);
+    path.join(repoRoot, '..', 'nesting', 'Cargo.toml')
+  ].filter(Boolean)
 
-  return candidates.find(candidate => {
-    try {
-      return fs.existsSync(candidate) && fs.statSync(candidate).isFile();
-    } catch {
-      return false;
-    }
-  }) || null;
+  return (
+    candidates.find((candidate) => {
+      try {
+        return candidate && fs.existsSync(candidate) && fs.statSync(candidate).isFile()
+      } catch {
+        return false
+      }
+    }) || null
+  )
 }
 
 function buildCargoRunCommand(args) {
-  const manifestPath = resolveSparrowCargoManifestPath();
-  if (!manifestPath) return null;
+  const manifestPath = resolveSparrowCargoManifestPath()
+  if (!manifestPath) return null
 
   return [
     'cargo',
@@ -80,387 +81,422 @@ function buildCargoRunCommand(args) {
     '--bin',
     'sparrow',
     '--',
-    ...args,
-  ].map(shellQuote).join(' ');
+    ...args
+  ]
+    .map(shellQuote)
+    .join(' ')
 }
 
 function buildSpawnCommand(executablePath, args) {
-  return [executablePath, ...args].map(shellQuote).join(' ');
+  return [executablePath, ...args].map(shellQuote).join(' ')
 }
 
 function readJsonIfExists(filePath) {
-  if (!fs.existsSync(filePath)) return null;
-  return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  if (!fs.existsSync(filePath)) return null
+  return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
 }
 function readPlacedItemCounts(jsonPath) {
-  let stripData = null;
+  let stripData: any = null
   try {
-    stripData = readJsonIfExists(jsonPath);
+    stripData = readJsonIfExists(jsonPath)
   } catch {
-    return [];
+    return []
   }
   const placedItems = Array.isArray(stripData?.solution?.layout?.placed_items)
     ? stripData.solution.layout.placed_items
-    : [];
-  const counts = new Map();
-  placedItems.forEach(placement => {
-    const itemId = Number(placement?.item_id);
-    if (!Number.isFinite(itemId)) return;
-    counts.set(itemId, (counts.get(itemId) || 0) + 1);
-  });
+    : []
+  const counts = new Map()
+  placedItems.forEach((placement) => {
+    const itemId = Number(placement?.item_id)
+    if (!Number.isFinite(itemId)) return
+    counts.set(itemId, (counts.get(itemId) || 0) + 1)
+  })
   return [...counts.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([item_id, count]) => ({ item_id, count }));
+    .map(([item_id, count]) => ({ item_id, count }))
 }
 function rewriteTailIdMapping(runDir, safeName, inputPath) {
-  const inputJson = readJsonIfExists(inputPath);
-  const mapping = inputJson?._tailIdMapping;
-  if (!mapping || typeof mapping !== 'object') return;
+  const inputJson = readJsonIfExists(inputPath)
+  const mapping = inputJson?._tailIdMapping
+  if (!mapping || typeof mapping !== 'object') return
 
-  const outputDir = path.join(runDir, 'output');
+  const outputDir = path.join(runDir, 'output')
   const rewrite = (jsonPath) => {
-    const data = readJsonIfExists(jsonPath);
-    if (!data) return;
-    let changed = false;
+    const data = readJsonIfExists(jsonPath)
+    if (!data) return
+    let changed = false
     if (Array.isArray(data.items)) {
-      data.items.forEach(item => {
-        const original = mapping[String(item.id)];
-        if (original !== undefined) { item.id = original; changed = true; }
-      });
+      data.items.forEach((item) => {
+        const original = mapping[String(item.id)]
+        if (original !== undefined) {
+          item.id = original
+          changed = true
+        }
+      })
     }
-    const placed = data.solution?.layout?.placed_items;
+    const placed = data.solution?.layout?.placed_items
     if (Array.isArray(placed)) {
-      placed.forEach(p => {
-        const original = mapping[String(p.item_id)];
-        if (original !== undefined) { p.item_id = original; changed = true; }
-      });
+      placed.forEach((p) => {
+        const original = mapping[String(p.item_id)]
+        if (original !== undefined) {
+          p.item_id = original
+          changed = true
+        }
+      })
     }
-    if (changed) fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf-8');
-  };
+    if (changed) fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf-8')
+  }
 
   // Continuous final
-  const continuousJson = path.join(outputDir, `final_${safeName}.json`);
-  if (fs.existsSync(continuousJson)) rewrite(continuousJson);
+  const continuousJson = path.join(outputDir, `final_${safeName}.json`)
+  if (fs.existsSync(continuousJson)) rewrite(continuousJson)
 
   // Multi-strip final
   const finalDir = [
     path.join(outputDir, `final_${safeName}`),
     ...(!fs.existsSync(path.join(outputDir, `final_${safeName}`))
-      ? (fs.existsSync(outputDir)
-        ? fs.readdirSync(outputDir, { withFileTypes: true })
-            .filter(e => e.isDirectory() && e.name.startsWith('final_'))
-            .map(e => path.join(outputDir, e.name))
-        : [])
-      : []),
-  ].find(d => fs.existsSync(d));
+      ? fs.existsSync(outputDir)
+        ? fs
+            .readdirSync(outputDir, { withFileTypes: true })
+            .filter((e) => e.isDirectory() && e.name.startsWith('final_'))
+            .map((e) => path.join(outputDir, e.name))
+        : []
+      : [])
+  ].find((d) => fs.existsSync(d))
   if (finalDir && fs.statSync(finalDir).isDirectory()) {
     fs.readdirSync(finalDir)
-      .filter(name => name.endsWith('.json') && name !== 'summary.json')
-      .forEach(name => rewrite(path.join(finalDir, name)));
+      .filter((name) => name.endsWith('.json') && name !== 'summary.json')
+      .forEach((name) => rewrite(path.join(finalDir, name)))
   }
 }
 
 function readLiveManifestIfExists(filePath) {
-  if (!fs.existsSync(filePath)) return null;
-  const raw = fs.readFileSync(filePath, 'utf-8');
-  const match = raw.match(/window\.__SPARROW_LIVE_MANIFEST\s*=\s*(\{[\s\S]*\})\s*;/);
-  if (!match) return null;
-  return JSON.parse(match[1]);
+  if (!fs.existsSync(filePath)) return null
+  const raw = fs.readFileSync(filePath, 'utf-8')
+  const match = raw.match(/window\.__SPARROW_LIVE_MANIFEST\s*=\s*(\{[\s\S]*\})\s*;/)
+  if (!match) return null
+  return JSON.parse(match[1])
 }
 
 function countPlacedItemsInSvg(svgText) {
-  const text = String(svgText || '');
-  const matches = text.match(/<use\b[^>]*href="#item_[^"]+"/g);
-  return matches ? matches.length : 0;
+  const text = String(svgText || '')
+  const matches = text.match(/<use\b[^>]*href="#item_[^"]+"/g)
+  return matches ? matches.length : 0
 }
 
 function collectStripSvgsFromDir(baseDir, { isPreview }) {
-  if (!baseDir || !fs.existsSync(baseDir)) return [];
+  if (!baseDir || !fs.existsSync(baseDir)) return []
 
-  const stripDirs = fs.readdirSync(baseDir, { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && /^strip_\d+$/i.test(entry.name))
-    .map(entry => entry.name)
-    .sort();
+  const stripDirs = fs
+    .readdirSync(baseDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^strip_\d+$/i.test(entry.name))
+    .map((entry) => entry.name)
+    .sort()
 
   if (stripDirs.length) {
-    return stripDirs.map(dirName => {
-      const stripDir = path.join(baseDir, dirName);
-      const svgFiles = fs.readdirSync(stripDir)
-        .filter(name => name.toLowerCase().endsWith('.svg'))
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-      const latest = svgFiles[svgFiles.length - 1];
-      if (!latest) return null;
-      const svgPath = path.join(stripDir, latest);
-      const svgText = fs.readFileSync(svgPath, 'utf-8');
-      return {
-        index: Number(dirName.match(/\d+/)?.[0] || 0),
-        svg_path: svgPath,
-        json_path: null,
-        svg: svgText,
-        item_count: countPlacedItemsInSvg(svgText),
-        is_preview: isPreview,
-      };
-    }).filter(Boolean);
+    return stripDirs
+      .map((dirName) => {
+        const stripDir = path.join(baseDir, dirName)
+        const svgFiles = fs
+          .readdirSync(stripDir)
+          .filter((name) => name.toLowerCase().endsWith('.svg'))
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+        const latest = svgFiles[svgFiles.length - 1]
+        if (!latest) return null
+        const svgPath = path.join(stripDir, latest)
+        const svgText = fs.readFileSync(svgPath, 'utf-8')
+        return {
+          index: Number(dirName.match(/\d+/)?.[0] || 0),
+          svg_path: svgPath,
+          json_path: null,
+          svg: svgText,
+          item_count: countPlacedItemsInSvg(svgText),
+          is_preview: isPreview
+        }
+      })
+      .filter(Boolean)
   }
 
-  const flatSvgFiles = fs.readdirSync(baseDir)
-    .filter(name => name.toLowerCase().endsWith('.svg'))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  const latestFlat = flatSvgFiles[flatSvgFiles.length - 1];
-  if (!latestFlat) return [];
+  const flatSvgFiles = fs
+    .readdirSync(baseDir)
+    .filter((name) => name.toLowerCase().endsWith('.svg'))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const latestFlat = flatSvgFiles[flatSvgFiles.length - 1]
+  if (!latestFlat) return []
 
-  const svgPath = path.join(baseDir, latestFlat);
-  const stripWidthMatch = latestFlat.match(/^\d+_([-\d.]+)_/);
-  const stripWidth = stripWidthMatch ? Number(stripWidthMatch[1]) : null;
-  const svgText = fs.readFileSync(svgPath, 'utf-8');
+  const svgPath = path.join(baseDir, latestFlat)
+  const stripWidthMatch = latestFlat.match(/^\d+_([-\d.]+)_/)
+  const stripWidth = stripWidthMatch ? Number(stripWidthMatch[1]) : null
+  const svgText = fs.readFileSync(svgPath, 'utf-8')
 
-  return [{
-    index: 1,
-    svg_path: svgPath,
-    json_path: null,
-    svg: svgText,
-    strip_width: Number.isFinite(stripWidth) ? stripWidth : null,
-    item_count: countPlacedItemsInSvg(svgText),
-    is_preview: isPreview,
-  }];
+  return [
+    {
+      index: 1,
+      svg_path: svgPath,
+      json_path: null,
+      svg: svgText,
+      strip_width: Number.isFinite(stripWidth) ? stripWidth : null,
+      item_count: countPlacedItemsInSvg(svgText),
+      is_preview: isPreview
+    }
+  ]
 }
 
 function collectContinuousFinalArtifacts(outputDir, safeName) {
-  if (!outputDir || !fs.existsSync(outputDir)) return null;
+  if (!outputDir || !fs.existsSync(outputDir)) return null
 
-  const finalJsonPath = path.join(outputDir, `final_${safeName}.json`);
-  const finalSvgPath = path.join(outputDir, `final_${safeName}.svg`);
-  if (!fs.existsSync(finalJsonPath) || !fs.existsSync(finalSvgPath)) return null;
+  const finalJsonPath = path.join(outputDir, `final_${safeName}.json`)
+  const finalSvgPath = path.join(outputDir, `final_${safeName}.svg`)
+  if (!fs.existsSync(finalJsonPath) || !fs.existsSync(finalSvgPath)) return null
 
-  const finalJson = readJsonIfExists(finalJsonPath);
-  const solution = finalJson?.solution;
-  if (!solution) return null;
+  const finalJson = readJsonIfExists(finalJsonPath)
+  const solution = finalJson?.solution
+  if (!solution) return null
 
-  const svgText = fs.readFileSync(finalSvgPath, 'utf-8');
-  const stripWidth = Number(solution.strip_width);
-  const density = Number(solution.density ?? finalJson?.density);
+  const svgText = fs.readFileSync(finalSvgPath, 'utf-8')
+  const stripWidth = Number(solution.strip_width)
+  const density = Number(solution.density ?? finalJson?.density)
   const itemCount = Array.isArray(solution.placed_items)
     ? solution.placed_items.length
-    : countPlacedItemsInSvg(svgText);
+    : countPlacedItemsInSvg(svgText)
 
-  const placedItemCounts = readPlacedItemCounts(finalJsonPath);
+  const placedItemCounts = readPlacedItemCounts(finalJsonPath)
   const summary = compactLastStripArtifacts({
     name: finalJson?.name || safeName,
     strip_count: 1,
     density: Number.isFinite(density) ? density : null,
     is_preview: false,
-    strips: [{
-      index: 1,
-      svg_path: finalSvgPath,
-      json_path: finalJsonPath,
-      svg: svgText,
-      strip_width: Number.isFinite(stripWidth) ? stripWidth : null,
-      density: Number.isFinite(density) ? density : null,
-      item_count: Number.isFinite(itemCount) ? itemCount : 0,
-      placed_item_counts: placedItemCounts,
-      placed_item_ids: placedItemCounts.map(item => item.item_id),
-      is_preview: false,
-    }],
-  });
+    strips: [
+      {
+        index: 1,
+        svg_path: finalSvgPath,
+        json_path: finalJsonPath,
+        svg: svgText,
+        strip_width: Number.isFinite(stripWidth) ? stripWidth : null,
+        density: Number.isFinite(density) ? density : null,
+        item_count: Number.isFinite(itemCount) ? itemCount : 0,
+        placed_item_counts: placedItemCounts,
+        placed_item_ids: placedItemCounts.map((item) => item.item_id),
+        is_preview: false
+      }
+    ]
+  })
 
   return {
     summaryPath: finalJsonPath,
-    summary,
-  };
+    summary
+  }
 }
 function collectRootFinalSvgPreview(outputDir, safeName) {
-  if (!outputDir || !fs.existsSync(outputDir)) return null;
+  if (!outputDir || !fs.existsSync(outputDir)) return null
 
-  const finalSvgPath = path.join(outputDir, `final_${safeName}.svg`);
-  if (!fs.existsSync(finalSvgPath)) return null;
+  const finalSvgPath = path.join(outputDir, `final_${safeName}.svg`)
+  if (!fs.existsSync(finalSvgPath)) return null
 
-  const svgText = fs.readFileSync(finalSvgPath, 'utf-8');
+  const svgText = fs.readFileSync(finalSvgPath, 'utf-8')
   return {
     summaryPath: finalSvgPath,
     summary: {
       name: safeName,
       strip_count: 1,
-      strips: [{
-        index: 1,
-        svg_path: finalSvgPath,
-        json_path: null,
-        svg: svgText,
-        item_count: countPlacedItemsInSvg(svgText),
-        is_preview: true,
-      }],
-      is_preview: true,
-    },
-  };
+      strips: [
+        {
+          index: 1,
+          svg_path: finalSvgPath,
+          json_path: null,
+          svg: svgText,
+          item_count: countPlacedItemsInSvg(svgText),
+          is_preview: true
+        }
+      ],
+      is_preview: true
+    }
+  }
 }
 
 function collectLiveArtifacts(runDir, safeName) {
-  const liveDir = path.join(runDir, 'data', 'live');
-  if (!fs.existsSync(liveDir)) return null;
+  const liveDir = path.join(runDir, 'data', 'live')
+  if (!fs.existsSync(liveDir)) return null
 
-  const manifestPath = path.join(liveDir, '.live_manifest.js');
-  const manifest = readLiveManifestIfExists(manifestPath);
-  if (manifest?.mode === 'multi_strip' && Array.isArray(manifest.strips) && manifest.strips.length) {
+  const manifestPath = path.join(liveDir, '.live_manifest.js')
+  const manifest = readLiveManifestIfExists(manifestPath)
+  if (
+    manifest?.mode === 'multi_strip' &&
+    Array.isArray(manifest.strips) &&
+    manifest.strips.length
+  ) {
     const strips = manifest.strips
-      .map(strip => {
-        const relativeSvgPath = String(strip.svg_path || '').trim();
-        if (!relativeSvgPath) return null;
-        const svgPath = path.resolve(liveDir, relativeSvgPath);
-        if (!fs.existsSync(svgPath)) return null;
-        const svgText = fs.readFileSync(svgPath, 'utf-8');
+      .map((strip) => {
+        const relativeSvgPath = String(strip.svg_path || '').trim()
+        if (!relativeSvgPath) return null
+        const svgPath = path.resolve(liveDir, relativeSvgPath)
+        if (!fs.existsSync(svgPath)) return null
+        const svgText = fs.readFileSync(svgPath, 'utf-8')
         return {
           index: Number(strip.index) || 0,
           svg_path: svgPath,
           json_path: null,
           svg: svgText,
-          strip_width: Number.isFinite(Number(strip.strip_width)) ? Number(strip.strip_width) : null,
+          strip_width: Number.isFinite(Number(strip.strip_width))
+            ? Number(strip.strip_width)
+            : null,
           density: Number.isFinite(Number(strip.density)) ? Number(strip.density) : null,
           item_count: countPlacedItemsInSvg(svgText),
           state: strip.state || null,
-          is_preview: true,
-        };
+          is_preview: true
+        }
       })
       .filter(Boolean)
-      .sort((a, b) => a.index - b.index);
+      .sort((a, b) => a.index - b.index)
 
-    if (!strips.length) return null;
+    if (!strips.length) return null
     return {
       summaryPath: manifestPath,
       summary: {
         name: manifest.name || safeName,
         strip_count: Number(manifest.strip_count) || strips.length,
-        current_strip: Number.isFinite(Number(manifest.current_strip)) ? Number(manifest.current_strip) : null,
+        current_strip: Number.isFinite(Number(manifest.current_strip))
+          ? Number(manifest.current_strip)
+          : null,
         strips,
-        is_preview: true,
-      },
-    };
+        is_preview: true
+      }
+    }
   }
 
-  const singleLiveSvgPath = path.join(liveDir, '.live_solution.svg');
+  const singleLiveSvgPath = path.join(liveDir, '.live_solution.svg')
   if (fs.existsSync(singleLiveSvgPath)) {
-    const svgText = fs.readFileSync(singleLiveSvgPath, 'utf-8');
+    const svgText = fs.readFileSync(singleLiveSvgPath, 'utf-8')
     return {
       summaryPath: singleLiveSvgPath,
       summary: {
         name: safeName,
         strip_count: 1,
-        strips: [{
-          index: 1,
-          svg_path: singleLiveSvgPath,
-          json_path: null,
-          svg: svgText,
-          item_count: countPlacedItemsInSvg(svgText),
-          is_preview: true,
-        }],
-        is_preview: true,
-      },
-    };
+        strips: [
+          {
+            index: 1,
+            svg_path: singleLiveSvgPath,
+            json_path: null,
+            svg: svgText,
+            item_count: countPlacedItemsInSvg(svgText),
+            is_preview: true
+          }
+        ],
+        is_preview: true
+      }
+    }
   }
 
-  return null;
+  return null
 }
 
 function resolveOutputSubdir(runDir, preferredName, prefix) {
-  const preferredPath = path.join(runDir, 'output', preferredName);
-  if (fs.existsSync(preferredPath)) return preferredPath;
+  const preferredPath = path.join(runDir, 'output', preferredName)
+  if (fs.existsSync(preferredPath)) return preferredPath
 
-  const outputDir = path.join(runDir, 'output');
-  if (!fs.existsSync(outputDir)) return null;
+  const outputDir = path.join(runDir, 'output')
+  if (!fs.existsSync(outputDir)) return null
 
-  const matches = fs.readdirSync(outputDir, { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && entry.name.startsWith(prefix))
-    .map(entry => path.join(outputDir, entry.name))
+  const matches = fs
+    .readdirSync(outputDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix))
+    .map((entry) => path.join(outputDir, entry.name))
     .sort((a, b) => {
       try {
-        return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
+        return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs
       } catch {
-        return 0;
+        return 0
       }
-    });
+    })
 
-  return matches[0] || null;
+  return matches[0] || null
 }
 
 function latestSvgPerStrip(runDir, safeName) {
-  const solsDir = resolveOutputSubdir(runDir, `sols_${safeName}`, 'sols_');
-  return collectStripSvgsFromDir(solsDir, { isPreview: true });
+  const solsDir = resolveOutputSubdir(runDir, `sols_${safeName}`, 'sols_')
+  return collectStripSvgsFromDir(solsDir, { isPreview: true })
 }
 
 function collectSparrowArtifacts(runDir, safeName) {
-  const outputDir = path.join(runDir, 'output');
-  const continuousFinal = collectContinuousFinalArtifacts(outputDir, safeName);
-  if (continuousFinal) return continuousFinal;
+  const outputDir = path.join(runDir, 'output')
+  const continuousFinal = collectContinuousFinalArtifacts(outputDir, safeName)
+  if (continuousFinal) return continuousFinal
 
-  const finalDir = resolveOutputSubdir(runDir, `final_${safeName}`, 'final_');
+  const finalDir = resolveOutputSubdir(runDir, `final_${safeName}`, 'final_')
   if (!finalDir) {
-    const strips = latestSvgPerStrip(runDir, safeName);
+    const strips = latestSvgPerStrip(runDir, safeName)
     return {
       summaryPath: null,
-      summary: strips.length ? {
-        name: safeName,
-        strip_count: strips.length,
-        strips,
-        is_preview: true,
-      } : null,
-    };
+      summary: strips.length
+        ? {
+            name: safeName,
+            strip_count: strips.length,
+            strips,
+            is_preview: true
+          }
+        : null
+    }
   }
 
-  const summaryPath = path.join(finalDir, 'summary.json');
-  const summary = readJsonIfExists(summaryPath);
+  const summaryPath = path.join(finalDir, 'summary.json')
+  const summary = readJsonIfExists(summaryPath)
 
   if (summary?.strips?.length) {
     const mappedSummary = compactLastStripArtifacts({
       ...summary,
-      strips: summary.strips.map(strip => {
-        const svgPath = path.resolve(runDir, strip.svg_path);
-        const jsonPath = path.resolve(runDir, strip.json_path);
-        const placedItemCounts = readPlacedItemCounts(jsonPath);
+      strips: summary.strips.map((strip) => {
+        const svgPath = path.resolve(runDir, strip.svg_path)
+        const jsonPath = path.resolve(runDir, strip.json_path)
+        const placedItemCounts = readPlacedItemCounts(jsonPath)
         return {
           ...strip,
           svg_path: svgPath,
           json_path: jsonPath,
           svg: fs.existsSync(svgPath) ? fs.readFileSync(svgPath, 'utf-8') : '',
           placed_item_counts: placedItemCounts,
-          placed_item_ids: placedItemCounts.map(item => item.item_id),
-          is_preview: false,
-        };
-      }),
-    });
+          placed_item_ids: placedItemCounts.map((item) => item.item_id),
+          is_preview: false
+        }
+      })
+    })
     return {
       summaryPath,
-      summary: mappedSummary,
-    };
+      summary: mappedSummary
+    }
   }
 
-  const strips = collectStripSvgsFromDir(finalDir, { isPreview: false });
+  const strips = collectStripSvgsFromDir(finalDir, { isPreview: false })
   return {
     summaryPath,
-    summary: strips.length ? {
-      name: safeName,
-      strip_count: strips.length,
-      strips,
-      is_preview: false,
-    } : null,
-  };
+    summary: strips.length
+      ? {
+          name: safeName,
+          strip_count: strips.length,
+          strips,
+          is_preview: false
+        }
+      : null
+  }
 }
 
 function markArtifactsAsPreview(artifacts) {
-  if (!artifacts?.summary) return artifacts;
+  if (!artifacts?.summary) return artifacts
   return {
     ...artifacts,
     summary: {
       ...artifacts.summary,
       is_preview: true,
       strips: Array.isArray(artifacts.summary.strips)
-        ? artifacts.summary.strips.map(strip => ({ ...strip, is_preview: true }))
-        : [],
-    },
-  };
+        ? artifacts.summary.strips.map((strip) => ({ ...strip, is_preview: true }))
+        : []
+    }
+  }
 }
 
 function collectRunningSparrowArtifacts(runDir, safeName) {
   try {
-    const liveArtifacts = collectLiveArtifacts(runDir, safeName);
-    if (liveArtifacts?.summary?.strips?.length) return liveArtifacts;
+    const liveArtifacts = collectLiveArtifacts(runDir, safeName)
+    if (liveArtifacts?.summary?.strips?.length) return liveArtifacts
   } catch {
     // Ignore transient live-preview read failures while Sparrow is still writing files.
   }
@@ -470,7 +506,7 @@ function collectRunningSparrowArtifacts(runDir, safeName) {
     // under output/sols_* while the run is active, even though the final_*
     // directory already exists. Probe those first so the UI can stream
     // per-strip progress instead of waiting for the completed summary.
-    const strips = latestSvgPerStrip(runDir, safeName);
+    const strips = latestSvgPerStrip(runDir, safeName)
     if (strips.length) {
       return {
         summaryPath: null,
@@ -478,25 +514,25 @@ function collectRunningSparrowArtifacts(runDir, safeName) {
           name: safeName,
           strip_count: strips.length,
           strips,
-          is_preview: true,
-        },
-      };
+          is_preview: true
+        }
+      }
     }
   } catch {
     // Ignore transient intermediate-preview read failures while Sparrow is
     // still writing files.
   }
   try {
-    const rootPreview = collectRootFinalSvgPreview(path.join(runDir, 'output'), safeName);
-    if (rootPreview?.summary?.strips?.length) return rootPreview;
+    const rootPreview = collectRootFinalSvgPreview(path.join(runDir, 'output'), safeName)
+    if (rootPreview?.summary?.strips?.length) return rootPreview
   } catch {
     // Ignore transient root-preview read failures while Sparrow is still writing files.
   }
 
   try {
-    const artifacts = collectSparrowArtifacts(runDir, safeName);
+    const artifacts = collectSparrowArtifacts(runDir, safeName)
     if (artifacts?.summary?.strips?.length) {
-      return markArtifactsAsPreview(artifacts);
+      return markArtifactsAsPreview(artifacts)
     }
   } catch {
     // Ignore transient parse/read failures while Sparrow is still writing files.
@@ -504,89 +540,91 @@ function collectRunningSparrowArtifacts(runDir, safeName) {
 
   return {
     summaryPath: null,
-    summary: null,
-  };
+    summary: null
+  }
 }
 async function delay(ms) {
-  await new Promise(resolve => setTimeout(resolve, ms));
+  await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function hasExportableFinalSummary(summary) {
-  const strips = Array.isArray(summary?.strips) ? summary.strips : [];
+  const strips = Array.isArray(summary?.strips) ? summary.strips : []
   return !!(
-    strips.length
-    && !summary?.is_preview
-    && strips.every(strip => typeof strip?.json_path === 'string' && strip.json_path.trim() && fs.existsSync(strip.json_path))
-  );
+    strips.length &&
+    !summary?.is_preview &&
+    strips.every(
+      (strip) =>
+        typeof strip?.json_path === 'string' &&
+        strip.json_path.trim() &&
+        fs.existsSync(strip.json_path)
+    )
+  )
 }
 
-async function awaitCompletedArtifacts(runDir, safeName, {
-  attempts = 15,
-  delayMs = 100,
-} = {}) {
-  let artifacts = collectSparrowArtifacts(runDir, safeName);
-  if (hasExportableFinalSummary(artifacts?.summary)) return artifacts;
+async function awaitCompletedArtifacts(runDir, safeName, { attempts = 15, delayMs = 100 } = {}) {
+  let artifacts = collectSparrowArtifacts(runDir, safeName)
+  if (hasExportableFinalSummary(artifacts?.summary)) return artifacts
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await delay(delayMs);
-    artifacts = collectSparrowArtifacts(runDir, safeName);
-    if (hasExportableFinalSummary(artifacts?.summary)) return artifacts;
+    await delay(delayMs)
+    artifacts = collectSparrowArtifacts(runDir, safeName)
+    if (hasExportableFinalSummary(artifacts?.summary)) return artifacts
   }
 
-  return artifacts;
+  return artifacts
 }
 
 function terminateSparrowRun(runId, { markStopped = true, forceAfterMs = 2000 } = {}) {
-  const child = activeSparrowProcesses.get(runId);
-  if (!child) return false;
+  const child = activeSparrowProcesses.get(runId)
+  if (!child) return false
 
-  const run = sparrowRuns.get(runId);
+  const run = sparrowRuns.get(runId)
   if (run && markStopped && run.status === 'running') {
-    run.status = 'stopped';
+    run.status = 'stopped'
   }
 
   try {
-    child.kill('SIGTERM');
+    child.kill('SIGTERM')
   } catch {
     try {
-      child.kill();
+      child.kill()
     } catch {
-      return false;
+      return false
     }
   }
 
   if (Number.isFinite(forceAfterMs) && forceAfterMs > 0) {
     const timer = setTimeout(() => {
-      if (activeSparrowProcesses.get(runId) !== child) return;
+      if (activeSparrowProcesses.get(runId) !== child) return
       try {
-        child.kill('SIGKILL');
+        child.kill('SIGKILL')
       } catch {
         // Ignore force-kill failures during shutdown.
       }
-    }, forceAfterMs);
-    if (typeof timer.unref === 'function') timer.unref();
+    }, forceAfterMs)
+    if (typeof timer.unref === 'function') timer.unref()
   }
 
-  return true;
+  return true
 }
 
 function terminateAllSparrowRuns(options = {}) {
-  let stopped = 0;
-  [...activeSparrowProcesses.keys()].forEach(runId => {
-    if (terminateSparrowRun(runId, options)) stopped += 1;
-  });
-  return stopped;
+  let stopped = 0
+  ;[...activeSparrowProcesses.keys()].forEach((runId) => {
+    if (terminateSparrowRun(runId, options)) stopped += 1
+  })
+  return stopped
 }
 
 function registerSparrowIpc() {
   app.on('before-quit', () => {
-    terminateAllSparrowRuns({ markStopped: true, forceAfterMs: 1000 });
-  });
+    terminateAllSparrowRuns({ markStopped: true, forceAfterMs: 1000 })
+  })
 
   ipcMain.handle('get-native-engine-info', async () => {
     try {
-      const baseDir = nativeBaseDir();
-      const sparrowPath = resolveNativeExecutable('sparrow');
+      const baseDir = nativeBaseDir()
+      const sparrowPath = resolveNativeExecutable('sparrow')
 
       return {
         success: true,
@@ -595,87 +633,90 @@ function registerSparrowIpc() {
         baseDir,
         sparrowPath,
         exists: {
-          sparrow: fs.existsSync(sparrowPath),
-        },
-      };
-    } catch (err) {
-      return { success: false, error: err.message };
+          sparrow: fs.existsSync(sparrowPath)
+        }
+      }
+    } catch (err: any) {
+      return { success: false, error: err.message }
     }
-  });
+  })
 
   ipcMain.handle('run-sparrow', async (event, payload, options = {}) => {
     try {
-      const sparrowPath = resolveNativeExecutable('sparrow');
+      const sparrowPath = resolveNativeExecutable('sparrow')
       if (!fs.existsSync(sparrowPath)) {
-        return { success: false, error: `Sparrow executable not found at ${sparrowPath}` };
+        return { success: false, error: `Sparrow executable not found at ${sparrowPath}` }
       }
 
-      const safeName = String(payload?.name || 'nesting-job')
-        .replace(/[^a-z0-9-_]+/gi, '-')
-        .replace(/^-+|-+$/g, '') || 'nesting-job';
+      const safeName =
+        String(payload?.name || 'nesting-job')
+          .replace(/[^a-z0-9-_]+/gi, '-')
+          .replace(/^-+|-+$/g, '') || 'nesting-job'
 
-      payload.name = safeName;
-      const runsRootDir = path.join(app.getPath('temp'), 'nestkit-runs');
-      cleanupTempArtifacts(runsRootDir);
-      const runDir = path.join(runsRootDir, `${safeName}-${Date.now()}`);
-      fs.mkdirSync(runDir, { recursive: true });
+      payload.name = safeName
+      const runsRootDir = path.join(app.getPath('temp'), 'nestkit-runs')
+      cleanupTempArtifacts(runsRootDir)
+      const runDir = path.join(runsRootDir, `${safeName}-${Date.now()}`)
+      fs.mkdirSync(runDir, { recursive: true })
 
-      const inputPath = path.join(runDir, `${safeName}.json`);
-      fs.writeFileSync(inputPath, JSON.stringify(payload, null, 2), 'utf-8');
+      const inputPath = path.join(runDir, `${safeName}.json`)
+      fs.writeFileSync(inputPath, JSON.stringify(payload, null, 2), 'utf-8')
 
-      const args = ['--input', inputPath];
+      const args = ['--input', inputPath]
       if (Number.isFinite(options.globalTime) && options.globalTime > 0) {
-        args.push('--global-time', String(options.globalTime));
+        args.push('--global-time', String(options.globalTime))
       }
       if (Number.isFinite(options.rngSeed)) {
-        args.push('--rng-seed', String(options.rngSeed));
+        args.push('--rng-seed', String(options.rngSeed))
       }
       // ponytail: Sparrow binary in this environment does not support --workers; restore when CLI adds it.
       // if (Number.isFinite(options.workers) && options.workers >= 1) {
       //   args.push('--workers', String(Math.trunc(options.workers)));
       // }
       if (options.earlyTermination) {
-        args.push('--early-termination');
+        args.push('--early-termination')
       }
       if (Number.isFinite(options.maxStripLength) && options.maxStripLength > 0) {
-        args.push('--max-strip-length', String(options.maxStripLength));
+        args.push('--max-strip-length', String(options.maxStripLength))
       }
       if (Number.isFinite(options.stripMargin) && options.stripMargin >= 0) {
-        args.push('--strip-margin', String(options.stripMargin));
+        args.push('--strip-margin', String(options.stripMargin))
       }
       if (Number.isFinite(options.minItemSeparation) && options.minItemSeparation >= 0) {
-        args.push('--min-item-separation', String(options.minItemSeparation));
+        args.push('--min-item-separation', String(options.minItemSeparation))
       }
       if (Number.isFinite(options.bucketFillWeight) && options.bucketFillWeight >= 0) {
-        args.push('--bucket-fill-weight', String(options.bucketFillWeight));
+        args.push('--bucket-fill-weight', String(options.bucketFillWeight))
       }
       // Multi-strip strategy: 'barriers' (new mode, single canvas with virtual
       // separators) or 'prebucket' (legacy bucket planner). Only emitted when
       // explicitly set so older sparrow binaries that don't recognize the flag
       // can still be driven from this app.
       if (options.multiStripMode === 'barriers' || options.multiStripMode === 'prebucket') {
-        args.push('--multi-strip-mode', options.multiStripMode);
+        args.push('--multi-strip-mode', options.multiStripMode)
       }
-      if (options.align === 'top') args.push('--align-top');
-      if (options.align === 'top-left') args.push('--align-top-left');
-      if (options.align === 'top-right') args.push('--align-top-right');
-      if (options.align === 'bottom') args.push('--align-bottom');
-      if (options.align === 'bottom-left') args.push('--align-bottom-left');
-      if (options.align === 'bottom-right') args.push('--align-bottom-right');
+      if (options.align === 'top') args.push('--align-top')
+      if (options.align === 'top-left') args.push('--align-top-left')
+      if (options.align === 'top-right') args.push('--align-top-right')
+      if (options.align === 'bottom') args.push('--align-bottom')
+      if (options.align === 'bottom-left') args.push('--align-bottom-left')
+      if (options.align === 'bottom-right') args.push('--align-bottom-right')
 
       if (isDevMode()) {
-        const cargoCommand = buildCargoRunCommand(args);
-        console.info('[Sparrow][dev] Working directory:', runDir);
+        const cargoCommand = buildCargoRunCommand(args)
+        console.info('[Sparrow][dev] Working directory:', runDir)
         if (cargoCommand) {
-          console.info('[Sparrow][dev] Cargo command:\n' + cargoCommand);
+          console.info('[Sparrow][dev] Cargo command:\n' + cargoCommand)
         } else {
-          console.info('[Sparrow][dev] Cargo manifest not found. Set SPARROW_CARGO_MANIFEST_PATH to enable cargo command logging.');
+          console.info(
+            '[Sparrow][dev] Cargo manifest not found. Set SPARROW_CARGO_MANIFEST_PATH to enable cargo command logging.'
+          )
         }
-        console.info('[Sparrow][dev] Spawn command:\n' + buildSpawnCommand(sparrowPath, args));
+        console.info('[Sparrow][dev] Spawn command:\n' + buildSpawnCommand(sparrowPath, args))
       }
 
-      const runId = `${safeName}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      const child = spawn(sparrowPath, args, { cwd: runDir });
+      const runId = `${safeName}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      const child = spawn(sparrowPath, args, { cwd: runDir })
       sparrowRuns.set(runId, {
         id: runId,
         safeName,
@@ -685,46 +726,46 @@ function registerSparrowIpc() {
         stderr: '',
         status: 'running',
         exitCode: null,
-        error: null,
-      });
-      activeSparrowProcesses.set(runId, child);
+        error: null
+      })
+      activeSparrowProcesses.set(runId, child)
 
-      child.stdout.on('data', chunk => {
-        const run = sparrowRuns.get(runId);
-        if (run) run.stdout += chunk.toString();
-      });
-      child.stderr.on('data', chunk => {
-        const run = sparrowRuns.get(runId);
-        if (run) run.stderr += chunk.toString();
-      });
+      child.stdout.on('data', (chunk) => {
+        const run = sparrowRuns.get(runId)
+        if (run) run.stdout += chunk.toString()
+      })
+      child.stderr.on('data', (chunk) => {
+        const run = sparrowRuns.get(runId)
+        if (run) run.stderr += chunk.toString()
+      })
 
-      child.on('error', error => {
-        const run = sparrowRuns.get(runId);
+      child.on('error', (error) => {
+        const run = sparrowRuns.get(runId)
         if (run) {
-          run.status = 'error';
-          run.error = error.message;
+          run.status = 'error'
+          run.error = error.message
         }
-        activeSparrowProcesses.delete(runId);
-      });
+        activeSparrowProcesses.delete(runId)
+      })
 
-      child.on('close', code => {
-        const run = sparrowRuns.get(runId);
+      child.on('close', (code) => {
+        const run = sparrowRuns.get(runId)
         if (run) {
-          run.exitCode = code;
-          run.status = code === 0 ? 'completed' : (run.status === 'stopped' ? 'stopped' : 'error');
+          run.exitCode = code
+          run.status = code === 0 ? 'completed' : run.status === 'stopped' ? 'stopped' : 'error'
           if (code !== 0 && !run.error && run.status !== 'stopped') {
-            run.error = `Sparrow exited with code ${code}`;
+            run.error = `Sparrow exited with code ${code}`
           }
         }
-        activeSparrowProcesses.delete(runId);
+        activeSparrowProcesses.delete(runId)
         if (code === 0) {
           try {
-            rewriteTailIdMapping(runDir, safeName, inputPath);
-          } catch (err) {
-            console.warn('[Sparrow] Tail ID rewrite failed:', err);
+            rewriteTailIdMapping(runDir, safeName, inputPath)
+          } catch (err: any) {
+            console.warn('[Sparrow] Tail ID rewrite failed:', err)
           }
         }
-      });
+      })
 
       return {
         success: true,
@@ -732,37 +773,45 @@ function registerSparrowIpc() {
         runDir,
         inputPath,
         stdout: '',
-        stderr: '',
-      };
-    } catch (err) {
-      return { success: false, error: err.message };
+        stderr: ''
+      }
+    } catch (err: any) {
+      return { success: false, error: err.message }
     }
-  });
+  })
 
   ipcMain.handle('stop-sparrow', async (event, runId = null) => {
     try {
       if (runId) {
-        return { success: true, stopped: terminateSparrowRun(runId, { markStopped: true, forceAfterMs: 1000 }) };
+        return {
+          success: true,
+          stopped: terminateSparrowRun(runId, { markStopped: true, forceAfterMs: 1000 })
+        }
       }
-      return { success: true, stopped: terminateAllSparrowRuns({ markStopped: true, forceAfterMs: 1000 }) > 0 };
-    } catch (err) {
-      return { success: false, error: err.message };
+      return {
+        success: true,
+        stopped: terminateAllSparrowRuns({ markStopped: true, forceAfterMs: 1000 }) > 0
+      }
+    } catch (err: any) {
+      return { success: false, error: err.message }
     }
-  });
+  })
 
   ipcMain.handle('poll-sparrow', async (event, runId) => {
-    const run = sparrowRuns.get(runId);
+    const run = sparrowRuns.get(runId)
     if (!run) {
-      return { success: false, error: 'Run not found' };
+      return { success: false, error: 'Run not found' }
     }
 
-    const status = run.status;
-    const artifacts = status === 'running'
-      ? collectRunningSparrowArtifacts(run.runDir, run.safeName)
-      : await awaitCompletedArtifacts(run.runDir, run.safeName);
-    const error = status === 'error'
-      ? (run.stderr.trim() || run.stdout.trim() || run.error || 'Sparrow failed')
-      : null;
+    const status = run.status
+    const artifacts =
+      status === 'running'
+        ? collectRunningSparrowArtifacts(run.runDir, run.safeName)
+        : await awaitCompletedArtifacts(run.runDir, run.safeName)
+    const error =
+      status === 'error'
+        ? run.stderr.trim() || run.stdout.trim() || run.error || 'Sparrow failed'
+        : null
 
     return {
       success: true,
@@ -775,13 +824,9 @@ function registerSparrowIpc() {
       exitCode: run.exitCode,
       summaryPath: artifacts.summaryPath,
       summary: artifacts.summary,
-      error,
-    };
-  });
+      error
+    }
+  })
 }
 
-export {
-  registerSparrowIpc,
-  hasExportableFinalSummary,
-  awaitCompletedArtifacts,
-};
+export { registerSparrowIpc, hasExportableFinalSummary, awaitCompletedArtifacts }

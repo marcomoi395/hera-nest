@@ -1,4 +1,4 @@
-import type { Point } from '../types/geometry'
+import type { Point } from '../types/geometry-types'
 
 /**
  * Makes a short random ID for temporary UI list items.

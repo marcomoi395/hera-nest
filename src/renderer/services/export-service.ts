@@ -1,14 +1,41 @@
 import { formatWidthMeters } from '../helpers'
 import type { AppState } from '../state/store'
 import type { SettingsObject } from '../../types/settings'
+import type { Strip, NestSheet } from '../../types/dxf-types'
+
+interface ExportServiceDOM {
+  exportFolderLabel: HTMLElement
+  exportDXFBtn: HTMLButtonElement
+  exportSummarySheets: HTMLElement
+  exportSummaryParts: HTMLElement
+  exportSummaryUtil: HTMLElement
+  exportSummaryLength: HTMLElement
+  exportTableBody: HTMLTableSectionElement
+  exportModal: HTMLElement
+  openExportBtn: HTMLButtonElement
+  exportClose: HTMLButtonElement
+  exportCancel: HTMLButtonElement
+  exportChooseFolder: HTMLButtonElement
+  [key: string]: unknown
+}
 
 export interface ExportServiceDeps {
   state: AppState
-  dom: any
+  dom: ExportServiceDOM
   getCurrentNestingSettings: () => SettingsObject
 }
 
-export function createExportService({ state, dom, getCurrentNestingSettings }: ExportServiceDeps) {
+export interface ExportServiceApi {
+  loadLastExportFolder: () => Promise<void>
+  syncExportButton: () => void
+  bind: () => void
+}
+
+export function createExportService({
+  state,
+  dom,
+  getCurrentNestingSettings
+}: ExportServiceDeps): ExportServiceApi {
   let exportFolderPath: string | null = null
   let exportFolderBookmark: string | null = null
 
@@ -16,7 +43,7 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
     return !!(state.nestResult?.strips?.length && !state.nestResult?.is_preview)
   }
 
-  function exportSheetWidthForStrip(strip: any, sheet: any): number {
+  function exportSheetWidthForStrip(strip: Strip, sheet: NestSheet): number {
     if (sheet?.widthMode === 'fixed') {
       const configuredWidth = Number(sheet?.width)
       if (Number.isFinite(configuredWidth) && configuredWidth > 0) return configuredWidth
@@ -24,7 +51,7 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
     return Number(strip?.strip_width) || 0
   }
 
-  function exportSheetDensityForStrip(strip: any, sheet: any): number {
+  function exportSheetDensityForStrip(strip: Strip, sheet: NestSheet): number {
     const rawDensity = Number(strip?.density)
     if (!Number.isFinite(rawDensity)) return 0
 
@@ -77,17 +104,18 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
   }
 
   function normalizeStoredExportFolder(
-    saved: any
+    saved: unknown
   ): { path: string; bookmark: string | null } | null {
     if (!saved) return null
     if (typeof saved === 'string') {
       return saved.trim() ? { path: saved, bookmark: null } : null
     }
-    if (typeof saved?.path === 'string' && saved.path.trim()) {
+    const record = saved as Record<string, unknown>
+    if (typeof record?.path === 'string' && record.path.trim()) {
       return {
-        path: saved.path,
+        path: record.path,
         bookmark:
-          typeof saved?.bookmark === 'string' && saved.bookmark.trim() ? saved.bookmark : null
+          typeof record?.bookmark === 'string' && record.bookmark.trim() ? record.bookmark : null
       }
     }
     return null
@@ -96,7 +124,9 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
   async function loadLastExportFolder(): Promise<void> {
     if (!window.electronAPI?.loadAppSettings) return
     const result = await window.electronAPI.loadAppSettings()
-    const saved = normalizeStoredExportFolder((result?.settings as any)?.__lastExportFolder)
+    const saved = normalizeStoredExportFolder(
+      (result?.settings as Record<string, unknown>)?.__lastExportFolder
+    )
     if (saved) applyExportFolder(saved.path, saved.bookmark)
   }
 
@@ -120,9 +150,10 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
       applyExportFolder(result)
       await saveLastExportFolder(result)
     } else if (result && typeof result === 'object' && 'path' in result) {
-      applyExportFolder((result as any).path, (result as any).bookmark || null)
-      await saveLastExportFolder((result as any).path)
-      return (result as any).path
+      const folderResult = result as { path: string; bookmark?: string }
+      applyExportFolder(folderResult.path, folderResult.bookmark || null)
+      await saveLastExportFolder(folderResult.path)
+      return folderResult.path
     }
     return null
   }
@@ -133,11 +164,11 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
     const isPreview = !!state.nestResult?.is_preview
 
     if (dom.exportSummarySheets) dom.exportSummarySheets.textContent = String(strips.length)
-    const totalParts = strips.reduce((s: number, t: any) => s + (t.item_count || 0), 0)
+    const totalParts = strips.reduce((s: number, t: Strip) => s + (t.item_count || 0), 0)
     if (dom.exportSummaryParts) dom.exportSummaryParts.textContent = String(totalParts)
 
     const densities = strips
-      .map((strip: any) => exportSheetDensityForStrip(strip, sheet))
+      .map((strip: Strip) => exportSheetDensityForStrip(strip, sheet))
       .filter((value: number) => Number.isFinite(value) && value > 0)
 
     const avgUtil = densities.length
@@ -151,7 +182,7 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
     }
 
     const totalMm = strips.reduce(
-      (sum: number, strip: any) => sum + exportSheetWidthForStrip(strip, sheet),
+      (sum: number, strip: Strip) => sum + exportSheetWidthForStrip(strip, sheet),
       0
     )
     if (dom.exportSummaryLength)
@@ -166,7 +197,7 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
 
     if (dom.exportTableBody) {
       dom.exportTableBody.innerHTML = ''
-      strips.forEach((strip: any, i: number) => {
+      strips.forEach((strip: Strip, i: number) => {
         const w = roundUpDim(exportSheetWidthForStrip(strip, sheet))
         const h = roundUpDim(sheet.height || 0)
         const density = exportSheetDensityForStrip(strip, sheet)
@@ -248,7 +279,7 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
 
       try {
         const sheet = state.sheets[0] || {}
-        const strips = state.nestResult.strips.map((strip: any) => ({
+        const strips = state.nestResult?.strips?.map((strip: Strip) => ({
           index: strip.index,
           json_path: strip.json_path,
           strip_width: strip.strip_width,
@@ -262,13 +293,13 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
         const result = await window.electronAPI.exportSheetsDXF({
           outputDir: exportFolderPath!,
           outputDirBookmark: exportFolderBookmark || null,
-          jobName: state.nestResult.name || 'nesting-job',
+          jobName: state.nestResult?.name || 'nesting-job',
           inputPath: state.nestInputPath || null,
           settings:
             typeof getCurrentNestingSettings === 'function' ? getCurrentNestingSettings() : {},
           exportItems: state.lastPlacementExportItems || {},
-          strips,
-          sheets: strips
+          strips: strips || [],
+          sheets: strips || []
         })
 
         if (!result?.success) throw new Error(result?.error || 'Export failed')
@@ -279,7 +310,7 @@ export function createExportService({ state, dom, getCurrentNestingSettings }: E
         }
 
         if (dom.exportFolderLabel) {
-          const fileCount = Array.isArray(result.files) ? result.files.length : strips.length
+          const fileCount = Array.isArray(result.files) ? result.files.length : strips?.length || 0
           dom.exportFolderLabel.textContent = `${fileCount} file${fileCount !== 1 ? 's' : ''} saved to ${shortPath(exportFolderPath)}`
           dom.exportFolderLabel.classList.add('export-folder-success')
         }

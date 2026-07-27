@@ -6,7 +6,10 @@ export interface NestSummaryScore {
   bodyScore: number
 }
 
-export function effectiveStripDensity(strip: any, sheet: any = {}): number {
+export function effectiveStripDensity(
+  strip: Record<string, unknown>,
+  sheet: Record<string, unknown> = {}
+): number {
   const rawDensity = Number(strip?.density)
   if (!Number.isFinite(rawDensity) || rawDensity <= 0) return 0
   if (sheet?.widthMode !== 'fixed') return rawDensity
@@ -31,7 +34,10 @@ export function effectiveStripDensity(strip: any, sheet: any = {}): number {
   return usedArea / fixedArea
 }
 
-export function scoreNestSummary(summary: any, sheet: any = {}): NestSummaryScore {
+export function scoreNestSummary(
+  summary: Record<string, unknown>,
+  sheet: Record<string, unknown> = {}
+): NestSummaryScore {
   const strips = Array.isArray(summary?.strips) ? summary.strips : []
   if (!strips.length) {
     return {
@@ -44,7 +50,7 @@ export function scoreNestSummary(summary: any, sheet: any = {}): NestSummaryScor
   }
 
   const totalItemCount = strips.reduce(
-    (sum: number, strip: any) => sum + (Number(strip?.item_count) || 0),
+    (sum: number, strip: Record<string, unknown>) => sum + (Number(strip?.item_count) || 0),
     0
   )
   const stripCount = strips.length
@@ -55,7 +61,7 @@ export function scoreNestSummary(summary: any, sheet: any = {}): NestSummaryScor
   let bodyScore = 0
   if (strips.length > 1) {
     const bodyStrips = strips.slice(0, -1)
-    bodyScore = bodyStrips.reduce((sum: number, strip: any) => {
+    bodyScore = bodyStrips.reduce((sum: number, strip: Record<string, unknown>) => {
       const density = effectiveStripDensity(strip, sheet)
       return sum + Math.pow(density, 2)
     }, 0)

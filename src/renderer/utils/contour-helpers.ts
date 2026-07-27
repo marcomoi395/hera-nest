@@ -9,6 +9,13 @@ export interface ContourResult {
   builderDebug: unknown | null
 }
 
+export interface ContourCandidate {
+  area?: number
+  mergeCount?: number
+  closureGap?: number
+  pathLength?: number
+}
+
 export function emptyContourResult(
   builderMode: string,
   builderDebug: unknown | null = null
@@ -36,7 +43,10 @@ export function bboxSpan(bbox: BoundingBox | null | undefined): number {
   return Math.max(EPS, bbox.maxX - bbox.minX, bbox.maxY - bbox.minY)
 }
 
-export function compareContourCandidatesByGeometry(a: any, b: any): number {
+export function compareContourCandidatesByGeometry(
+  a: ContourCandidate,
+  b: ContourCandidate
+): number {
   if (Math.abs((b.area || 0) - (a.area || 0)) > EPS) return (b.area || 0) - (a.area || 0)
   if ((a.mergeCount || 0) !== (b.mergeCount || 0)) return (a.mergeCount || 0) - (b.mergeCount || 0)
   if (Math.abs((a.closureGap || 0) - (b.closureGap || 0)) > EPS)

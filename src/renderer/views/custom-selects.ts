@@ -1,18 +1,21 @@
-export function createModalCustomSelects() {
+export function createModalCustomSelects(): {
+  closeOpenMenu: () => void
+  enhanceModalSelects: () => void
+} {
   const isLinux = document.body.classList.contains('platform-linux')
-  let openController: any = null
+  let openController: { close: () => void } | null = null
 
-  function closeOpenMenu() {
+  function closeOpenMenu(): void {
     if (!openController) return
     openController.close()
     openController = null
   }
 
-  function optionLabel(option: HTMLOptionElement | null) {
+  function optionLabel(option: HTMLOptionElement | null): string {
     return option?.textContent?.trim() || ''
   }
 
-  function enhanceSelect(select: any) {
+  function enhanceSelect(select: HTMLSelectElement): void {
     if (!isLinux || !select || select.dataset.customSelectEnhanced === 'true') return
 
     const wrapper = document.createElement('div')
@@ -34,7 +37,7 @@ export function createModalCustomSelects() {
     trigger.appendChild(triggerLabel)
     trigger.appendChild(triggerCaret)
 
-    select.parentNode.insertBefore(wrapper, select)
+    select.parentNode!.insertBefore(wrapper, select)
     wrapper.appendChild(select)
     wrapper.appendChild(trigger)
 
@@ -46,17 +49,22 @@ export function createModalCustomSelects() {
       wrapper.style.width = `${measuredWidth}px`
     }
 
-    function syncTrigger() {
-      triggerLabel.textContent = optionLabel(select.selectedOptions?.[0] || select.options?.[0] || null)
+    function syncTrigger(): void {
+      triggerLabel.textContent = optionLabel(
+        select.selectedOptions?.[0] || select.options?.[0] || null
+      )
     }
 
-    function renderMenu() {
+    function renderMenu(): HTMLElement {
       const menu = document.createElement('div')
       menu.className = 'custom-select-menu'
       menu.setAttribute('role', 'listbox')
-      menu.setAttribute('aria-label', select.getAttribute('aria-label') || select.id || 'Select options')
+      menu.setAttribute(
+        'aria-label',
+        select.getAttribute('aria-label') || select.id || 'Select options'
+      )
 
-      Array.from(select.options).forEach((option: any) => {
+      Array.from(select.options).forEach((option: HTMLOptionElement) => {
         const item = document.createElement('button')
         item.type = 'button'
         item.className = 'custom-select-option'
@@ -83,7 +91,7 @@ export function createModalCustomSelects() {
       return menu
     }
 
-    function positionMenu(menu: HTMLElement) {
+    function positionMenu(menu: HTMLElement): void {
       const rect = trigger.getBoundingClientRect()
       const gap = 6
       const menuHeight = menu.offsetHeight
@@ -99,7 +107,7 @@ export function createModalCustomSelects() {
       menu.style.minWidth = `${Math.ceil(rect.width)}px`
     }
 
-    function openMenu() {
+    function openMenu(): void {
       closeOpenMenu()
 
       const menu = renderMenu()
@@ -112,7 +120,7 @@ export function createModalCustomSelects() {
       const selectedItem = menu.querySelector('.custom-select-option.selected')
       if (selectedItem) selectedItem.scrollIntoView({ block: 'nearest' })
 
-      function close() {
+      function close(): void {
         menu.remove()
         wrapper.classList.remove('open')
         trigger.setAttribute('aria-expanded', 'false')
@@ -123,12 +131,12 @@ export function createModalCustomSelects() {
         if (openController?.close === close) openController = null
       }
 
-      function handleOutsidePointer(event: Event) {
+      function handleOutsidePointer(event: Event): void {
         if (wrapper.contains(event.target as Node) || menu.contains(event.target as Node)) return
         close()
       }
 
-      function handleKeydown(event: KeyboardEvent) {
+      function handleKeydown(event: KeyboardEvent): void {
         if (event.key === 'Escape') {
           event.preventDefault()
           close()
@@ -152,24 +160,31 @@ export function createModalCustomSelects() {
     })
 
     trigger.addEventListener('keydown', (event: KeyboardEvent) => {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === ' ' || event.key === 'Enter') {
+      if (
+        event.key === 'ArrowDown' ||
+        event.key === 'ArrowUp' ||
+        event.key === ' ' ||
+        event.key === 'Enter'
+      ) {
         event.preventDefault()
         if (!wrapper.classList.contains('open')) openMenu()
       }
     })
 
     select.addEventListener('change', syncTrigger)
-    select._syncCustomSelect = syncTrigger
+    ;(select as any)._syncCustomSelect = syncTrigger
     syncTrigger()
   }
 
-  function enhanceModalSelects() {
+  function enhanceModalSelects(): void {
     if (!isLinux) return
-    document.querySelectorAll('.modal-body select').forEach(enhanceSelect)
+    document
+      .querySelectorAll('.modal-body select')
+      .forEach((el) => enhanceSelect(el as HTMLSelectElement))
   }
 
   return {
     closeOpenMenu,
-    enhanceModalSelects,
+    enhanceModalSelects
   }
 }

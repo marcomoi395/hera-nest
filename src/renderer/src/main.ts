@@ -36,7 +36,7 @@ import { createDxfShapeStructureService } from '../services/dxf-shape-structure-
 import { initializeRenderer } from '../renderer'
 
 window.Flatten = Flatten
-window.jsts = (jstsModule as any).default || jstsModule
+window.jsts = (jstsModule as { default?: unknown }).default || jstsModule
 window.concaveman = concaveman
 
 window.NestConstants = NestConstants
@@ -60,22 +60,21 @@ window.NestDxfEngravingPreviewService = {
 window.NestDxfFlattenService = { buildSketchGroups, extractPolygonForEntities }
 window.NestDxfContourDetectionService = { detectContour }
 
-
 console.log('[MAIN.TS] Script loaded, readyState:', document.readyState)
 window.NestDxfShapeDetectionService = createDxfShapeDetectionService({
-  geometry: window.NestDxfGeometry,
-  svg: window.NestDxfSvg,
+  geometry: window.NestDxfGeometry as any,
+  svg: window.NestDxfSvg as any,
   concaveman: window.concaveman
 })
 window.NestDxfRasterEnvelopeService = createDxfRasterEnvelopeService({
-  geometry: window.NestDxfGeometry,
-  shapeDetectionService: window.NestDxfShapeDetectionService
+  geometry: window.NestDxfGeometry as any,
+  shapeDetectionService: window.NestDxfShapeDetectionService as any
 })
 window.NestDxfShapeStructureService = createDxfShapeStructureService({
-  geometry: window.NestDxfGeometry,
-  flattenService: window.NestDxfFlattenService,
-  shapeDetectionService: window.NestDxfShapeDetectionService,
-  rasterEnvelopeService: window.NestDxfRasterEnvelopeService
+  geometry: window.NestDxfGeometry as any,
+  flattenService: window.NestDxfFlattenService as any,
+  shapeDetectionService: window.NestDxfShapeDetectionService as any,
+  rasterEnvelopeService: window.NestDxfRasterEnvelopeService as any
 })
 
 console.log('[MAIN.TS] Checking for DOM elements...')
@@ -88,4 +87,3 @@ if (document.readyState === 'loading') {
 } else {
   initializeRenderer()
 }
-

@@ -13,6 +13,7 @@ const LINKEDIN_URL = ''
 
 let mainWindow: BrowserWindow | null = null
 let appMenuIpcRegistered = false
+let isAppQuitting = false
 
 function configureAppMetadata(): void {
   app.setName(productName)
@@ -248,8 +249,7 @@ function createWindow({
   mainWindow = new BrowserWindow(windowOptions)
 
   mainWindow.on('close', (event) => {
-    // @ts-ignore
-    if (process.platform === 'darwin' && !(app as any).isQuiting && !mainWindow?.isDestroyed()) {
+    if (process.platform === 'darwin' && !isAppQuitting && !mainWindow?.isDestroyed()) {
       event.preventDefault()
       mainWindow?.hide()
     }
@@ -314,9 +314,8 @@ export function initializeApp({
     createWindow({ isDevMode, minimalStartup })
   })
 
-  // @ts-ignore
   app.on('before-quit', () => {
-    (app as any).isQuiting = true
+    isAppQuitting = true
   })
 
   app.on('window-all-closed', () => {

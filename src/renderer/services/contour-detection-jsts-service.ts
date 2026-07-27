@@ -1,7 +1,8 @@
 // @ts-ignore - jsts loaded globally via window
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const jsts: any
 
-import type { Point } from '../../types/geometry'
+import type { Point } from '../../types/geometry-types'
 import { emptyContourResult, type ContourResult } from '../utils/contour-helpers'
 import {
   EPS,
@@ -18,14 +19,21 @@ import {
   polygonSignedArea
 } from '../utils/dxf-geometry'
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // Access contour-helpers functions that may be available
-const computeEntitiesBBox = (window as any).NestDxfContourHelpers?.computeEntitiesBBox || (() => null)
-const bboxSpan = (window as any).NestDxfContourHelpers?.bboxSpan || (() => 0)
-const debugDXF = (window as any).NestDxfShapeDetectionService?.debugDXF || (() => {})
-
+const computeEntitiesBBox =
+  (window as { NestDxfContourHelpers?: { computeEntitiesBBox?: (...args: any[]) => unknown } })
+    .NestDxfContourHelpers?.computeEntitiesBBox || ((..._args: any[]) => null)
+const bboxSpan =
+  (window as { NestDxfContourHelpers?: { bboxSpan?: (...args: any[]) => number } })
+    .NestDxfContourHelpers?.bboxSpan || ((..._args: any[]) => 0)
+const debugDXF =
+  (window as { NestDxfShapeDetectionService?: { debugDXF?: (...args: any[]) => void } })
+    .NestDxfShapeDetectionService?.debugDXF || ((..._args: any[]) => {})
+/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // ---- Curve sampling ------------------------------------------------------
 
-function sampleArcPoints(entity: any, maxStepDeg = 6): Point[] {
+function sampleArcPoints(entity: DxfEntity, maxStepDeg = 6): Point[] {
   const endpoints = getArcEndpoints(entity)
   if (!entity?.center || !Number.isFinite(entity.radius) || !endpoints) return []
   const start = Number.isFinite(entity.startAngle) ? entity.startAngle : 0
@@ -47,7 +55,11 @@ function sampleArcPoints(entity: any, maxStepDeg = 6): Point[] {
   return points
 }
 
-function pointsToSegments(points: Point[], close: boolean, tolerance: number): Array<[Point, Point]> {
+function pointsToSegments(
+  points: Point[],
+  close: boolean,
+  tolerance: number
+): Array<[Point, Point]> {
   if (!Array.isArray(points) || points.length < 2) return []
   const segments: Array<[Point, Point]> = []
   const limit = close ? points.length : points.length - 1
@@ -61,7 +73,7 @@ function pointsToSegments(points: Point[], close: boolean, tolerance: number): A
   return segments
 }
 
-function entityToSegments(entity: any, tolerance: number): Array<[Point, Point]> {
+function entityToSegments(entity: DxfEntity, tolerance: number): Array<[Point, Point]> {
   if (!entity?.type) return []
   switch (entity.type) {
     case 'LINE': {
@@ -89,7 +101,10 @@ function entityToSegments(entity: any, tolerance: number): Array<[Point, Point]>
           const arcPts: Point[] = [{ x: a.x, y: a.y }, ...bulgeToPoints(a, b, bulge, 6)]
           segs.push(...pointsToSegments(arcPts, false, tolerance))
         } else if (dist(a, b) > tolerance) {
-          segs.push([{ x: a.x, y: a.y }, { x: b.x, y: b.y }])
+          segs.push([
+            { x: a.x, y: a.y },
+            { x: b.x, y: b.y }
+          ])
         }
       }
       // Use polyline helper as backup if the manual walk produced nothing
@@ -120,24 +135,27 @@ function pickPrecisionScale(span: number): number {
   return Math.min(1e8, Math.max(1, Math.round(1 / targetSnap)))
 }
 
-function segmentsToLineStrings(segments: Array<[Point, Point]>, factory: any, scale: number): any[] {
-  const out: any[] = []
-  const snap = (v: number) => Math.round(v * scale) / scale
+function segmentsToLineStrings(
+  segments: Array<[Point, Point]>,
+  factory: JstsFactory,
+  scale: number
+): JstsGeometry[] {
+  const out: JstsGeometry[] = []
+  const snap = (v: number): number => Math.round(v * scale) / scale
   for (const [a, b] of segments) {
     const ax = snap(a.x)
     const ay = snap(a.y)
     const bx = snap(b.x)
     const by = snap(b.y)
     if (ax === bx && ay === by) continue
-    out.push(factory.createLineString([
-      new jsts.geom.Coordinate(ax, ay),
-      new jsts.geom.Coordinate(bx, by)
-    ]))
+    out.push(
+      factory.createLineString([new jsts.geom.Coordinate(ax, ay), new jsts.geom.Coordinate(bx, by)])
+    )
   }
   return out
 }
 
-function jstsCoordsToPoints(coords: any[]): Point[] {
+function jstsCoordsToPoints(coords: Array<{ x: number; y: number }>): Point[] {
   const pts: Point[] = []
   for (let i = 0; i < coords.length; i++) {
     const c = coords[i]
@@ -148,7 +166,11 @@ function jstsCoordsToPoints(coords: any[]): Point[] {
 }
 
 // Convert a JSTS Polygon into our { polygonPoints, area, holes } record.
-function jstsPolygonToCandidate(polygon: any): { polygonPoints: Point[]; area: number; holes: Point[][] } {
+function jstsPolygonToCandidate(polygon: JstsGeometry): {
+  polygonPoints: Point[]
+  area: number
+  holes: Point[][]
+} {
   const exterior = polygon.getExteriorRing()
   const outerPts = closePointRing(jstsCoordsToPoints(exterior.getCoordinates()))
   const area = Math.abs(polygonSignedArea(outerPts.slice(0, -1)))
@@ -167,13 +189,21 @@ function jstsPolygonToCandidate(polygon: any): { polygonPoints: Point[]; area: n
 // not snap intermediate intersections to it. We layer progressively
 // more aggressive robustness strategies and return the first one that
 // succeeds, tagging the strategy for debug.
-function robustUnaryUnion(geometries: any[], factory: any, scale: number): { result: any; strategy: string; error?: string; coarserScale?: number } {
+function robustUnaryUnion(
+  geometries: JstsGeometry[],
+  factory: JstsFactory,
+  scale: number
+): { result: JstsGeometry | null; strategy: string; error?: string; coarserScale?: number } {
   if (!geometries || !geometries.length) return { result: null, strategy: 'empty-input' }
-  let collection: any
+  let collection: JstsGeometry
   try {
     collection = factory.createGeometryCollection(geometries)
   } catch (error) {
-    return { result: null, strategy: 'collection-failed', error: (error as Error)?.message || String(error) }
+    return {
+      result: null,
+      strategy: 'collection-failed',
+      error: (error as Error)?.message || String(error)
+    }
   }
 
   // Strategy 1: straight union (fast path for well-behaved inputs).
@@ -185,8 +215,14 @@ function robustUnaryUnion(geometries: any[], factory: any, scale: number): { res
 
   // Strategy 2: explicit precision reduction on inputs.
   try {
-    const reduced = jsts.precision.GeometryPrecisionReducer.reduce(collection, factory.getPrecisionModel())
-    return { result: jsts.operation.union.UnaryUnionOp.union(reduced), strategy: 'precision-reduced' }
+    const reduced = jsts.precision.GeometryPrecisionReducer.reduce(
+      collection,
+      factory.getPrecisionModel()
+    )
+    return {
+      result: jsts.operation.union.UnaryUnionOp.union(reduced),
+      strategy: 'precision-reduced'
+    }
   } catch {
     /* fall through */
   }
@@ -217,8 +253,8 @@ function robustUnaryUnion(geometries: any[], factory: any, scale: number): { res
   }
 }
 
-function extractPolygonsFromGeometry(geom: any): any[] {
-  const out: any[] = []
+function extractPolygonsFromGeometry(geom: JstsGeometry): JstsGeometry[] {
+  const out: JstsGeometry[] = []
   if (!geom) return out
   const type = typeof geom.getGeometryType === 'function' ? geom.getGeometryType() : null
   if (type === 'Polygon') {
@@ -232,7 +268,12 @@ function extractPolygonsFromGeometry(geom: any): any[] {
   return out
 }
 
-export function buildArrangementContour(shapeRecord: any, options: any = {}): ContourResult {
+export function buildArrangementContour(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  shapeRecord: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  options: any = {}
+): ContourResult {
   const tolerance = Math.max(LOOP_TOLERANCE * 4, options.tolerance || LOOP_TOLERANCE * 8)
   const bbox = computeEntitiesBBox(shapeRecord?.entities || [])
   const span = bboxSpan(bbox)
@@ -254,16 +295,18 @@ export function buildArrangementContour(shapeRecord: any, options: any = {}): Co
 
   // 1. Sample entities into segments.
   const segments: Array<[Point, Point]> = []
-  ;(shapeRecord?.entities || []).forEach((entity: any) => {
+  ;(shapeRecord?.entities || []).forEach((entity: DxfEntity) => {
     segments.push(...entityToSegments(entity, tolerance))
   })
-  if (segments.length < 3) return reportEmpty('insufficient-segments', { segmentCount: segments.length })
+  if (segments.length < 3)
+    return reportEmpty('insufficient-segments', { segmentCount: segments.length })
 
   // 2. Build snap-rounded LineStrings.
   const pm = new jsts.geom.PrecisionModel(scale)
   const factory = new jsts.geom.GeometryFactory(pm)
   const lineStrings = segmentsToLineStrings(segments, factory, scale)
-  if (lineStrings.length < 3) return reportEmpty('insufficient-linestrings', { lineCount: lineStrings.length })
+  if (lineStrings.length < 3)
+    return reportEmpty('insufficient-linestrings', { lineCount: lineStrings.length })
 
   // 3. Self-union all segments — JTS does the noding internally.
   // Use the robust wrapper because classic overlay throws "non-noded
@@ -283,15 +326,15 @@ export function buildArrangementContour(shapeRecord: any, options: any = {}): Co
   const polygonizer = new jsts.operation.polygonize.Polygonizer()
   polygonizer.add(nodedGeometry)
   const polygonsCollection = polygonizer.getPolygons()
-  const facePolygons: any[] = []
+  const facePolygons: JstsGeometry[] = []
   if (polygonsCollection) {
-    const iter = typeof polygonsCollection.iterator === 'function'
-      ? polygonsCollection.iterator()
-      : null
+    const iter =
+      typeof polygonsCollection.iterator === 'function' ? polygonsCollection.iterator() : null
     if (iter) {
       while (iter.hasNext()) facePolygons.push(iter.next())
     } else if (typeof polygonsCollection.size === 'function') {
-      for (let i = 0; i < polygonsCollection.size(); i++) facePolygons.push(polygonsCollection.get(i))
+      for (let i = 0; i < polygonsCollection.size(); i++)
+        facePolygons.push(polygonsCollection.get(i))
     } else if (Array.isArray(polygonsCollection)) {
       facePolygons.push(...polygonsCollection)
     }
@@ -299,7 +342,7 @@ export function buildArrangementContour(shapeRecord: any, options: any = {}): Co
   if (!facePolygons.length) return reportEmpty('no-faces', { lineCount: lineStrings.length })
 
   // 5. Union the faces into the silhouette. One face = silhouette is itself.
-  let silhouette: any
+  let silhouette: JstsGeometry | null
   let silhouetteStrategy = 'single-face'
   if (facePolygons.length === 1) {
     silhouette = facePolygons[0]
@@ -319,12 +362,13 @@ export function buildArrangementContour(shapeRecord: any, options: any = {}): Co
 
   // 6. Extract outer rings — pick the largest area as the primary nesting contour.
   const outerPolygons = extractPolygonsFromGeometry(silhouette)
-  if (!outerPolygons.length) return reportEmpty('no-outer-polygons', { faceCount: facePolygons.length })
+  if (!outerPolygons.length)
+    return reportEmpty('no-outer-polygons', { faceCount: facePolygons.length })
 
   const ranked = outerPolygons
-    .map(p => jstsPolygonToCandidate(p))
-    .filter(c => Array.isArray(c.polygonPoints) && c.polygonPoints.length >= 4)
-    .map(c => ({
+    .map((p) => jstsPolygonToCandidate(p))
+    .filter((c) => Array.isArray(c.polygonPoints) && c.polygonPoints.length >= 4)
+    .map((c) => ({
       candidate: {
         polygonPoints: c.polygonPoints,
         source: 'jsts-arrangement',

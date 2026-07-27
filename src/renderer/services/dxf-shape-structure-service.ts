@@ -1,16 +1,159 @@
+import type { DxfEntity } from '../../types/dxf-types'
+import type { BoundingBox, ContourPoint } from '../../types/geometry-types'
+
+// Service dependency types
+interface GeometryService {
+  EPS: number
+  TWO_PI: number
+  LOOP_TOLERANCE: number
+  unionBBox: (a: BoundingBox | null, b: BoundingBox | null) => BoundingBox | null
+  entityBBox: (entity: DxfEntity) => BoundingBox | null
+  samplePoint: (entity: DxfEntity) => ContourPoint | null
+  safeSamplePoint: (entity: DxfEntity) => ContourPoint | null
+  pointInPoly: (x: number, y: number, points: ContourPoint[]) => boolean
+  bboxContainsPoint: (bbox: BoundingBox, point: ContourPoint, tolerance?: number) => boolean
+  closePointRing: (points: ContourPoint[]) => ContourPoint[]
+  polylineVerticesToPoints: (vertices: unknown[], closed: boolean) => ContourPoint[]
+  ellipseToPoints: (entity: DxfEntity, closed: boolean) => ContourPoint[]
+  splineToPoints: (entity: DxfEntity) => ContourPoint[]
+  circleToPoints: (entity: DxfEntity) => ContourPoint[]
+  polygonSignedArea: (points: ContourPoint[]) => number
+}
+
+interface FlattenService {
+  buildSketchGroups: (entities: DxfEntity[]) => DxfEntity[][]
+  extractPolygonForEntities: (entities: DxfEntity[]) => ExtractedPolygon | null
+}
+
+interface ShapeDetectionService {
+  debugDXF?: (phase: string, data: unknown) => void
+  buildClosedContoursFromLines?: (entities: DxfEntity[]) => ClosedContour[]
+}
+
+interface RasterEnvelopeService {
+  buildRasterEnvelopes: (
+    entities: DxfEntity[],
+    options: { strokeRadius?: number; sampleStep?: number; paddingCells?: number }
+  ) => RasterEnvelope[]
+}
+
+interface ExtractedPolygon {
+  polygonPoints: ContourPoint[]
+  area?: number
+}
+
+interface ClosedContour {
+  id: string
+  entity: DxfEntity
+  layer: string
+  bbox: BoundingBox
+  points: ContourPoint[]
+  polygonPoints: ContourPoint[]
+  area: number
+  sample: ContourPoint | null
+  isClosed: boolean
+}
+
+interface ContourScore {
+  insideCount: number
+  touchCount: number
+  closedInsideCount: number
+  bboxCoverage: number
+  stripPenalty: number
+  area: number
+  isSynthetic: boolean
+}
+
+interface RankedContour {
+  candidate: ClosedContour
+  score: ContourScore
+}
+
+interface ParentContourSelection {
+  parentContour: ClosedContour | null
+  peerOuters: ClosedContour[]
+  ranked: RankedContour[]
+}
+
+interface EntityAssignment {
+  ownedEntities: DxfEntity[]
+  insideEntities: DxfEntity[]
+  attachedEntities: DxfEntity[]
+}
+
+interface RasterEnvelope {
+  polygonPoints?: ContourPoint[]
+  entities?: DxfEntity[]
+}
+
+interface GroupMeta {
+  entities: DxfEntity[]
+  closedContours: ClosedContour[]
+  openEntities: DxfEntity[]
+  closedCount: number
+  openCount: number
+}
+
+interface EnvelopeOwner {
+  group: GroupMeta
+  envelopePoints: ContourPoint[] | null
+  envelopeBBox: BoundingBox | null
+  envelopeArea: number
+}
+
+interface GroupRecord {
+  entities: DxfEntity[]
+  envelopePoints?: ContourPoint[] | null
+}
+
+interface DetectedShape {
+  id: string
+  parentContour: ClosedContour | null
+  peerOuters: ClosedContour[]
+  childClosedContours: ClosedContour[]
+  openEntities: DxfEntity[]
+  entities: DxfEntity[]
+  bbox: BoundingBox | null
+  polygonPoints: ContourPoint[] | null
+  envelopePoints: ContourPoint[] | null
+  layer: string
+  usedWholeGroup: boolean
+}
+
+interface DetectionOptions {
+  singleSketch?: boolean
+}
+
 export function createDxfShapeStructureService(deps: {
-  geometry: any
-  flattenService: any
-  shapeDetectionService: any
-  rasterEnvelopeService?: any
-}) {
+  geometry: GeometryService
+  flattenService: FlattenService
+  shapeDetectionService: ShapeDetectionService
+  rasterEnvelopeService?: RasterEnvelopeService
+}): {
+  detectShapes: (entities: DxfEntity[], options?: DetectionOptions) => DetectedShape[]
+  detectShapeGroups: (entities: DxfEntity[], options?: DetectionOptions) => DxfEntity[][]
+  selectParentContour: (entities: DxfEntity[]) => ParentContourSelection
+  assignEntitiesToParent: (
+    parentContour: ClosedContour | null,
+    entities: DxfEntity[]
+  ) => EntityAssignment
+  collectContourCandidates: (entities: DxfEntity[]) => ClosedContour[]
+  rebuildShapeStructure: (shapes: unknown) => unknown
+} {
   const { geometry, flattenService, shapeDetectionService, rasterEnvelopeService } = deps
 
   if (!geometry) {
     return {
       detectShapes: () => [],
       detectShapeGroups: () => [],
-      selectParentContour: () => null,
+      selectParentContour: () => ({ parentContour: null, peerOuters: [], ranked: [] }),
+      assignEntitiesToParent: () => ({
+        ownedEntities: [],
+        insideEntities: [],
+        attachedEntities: [],
+        unownedEntities: []
+      }),
+      collectContourCandidates: () => [],
       rebuildShapeStructure: (shapes: unknown) => shapes
     }
   }
@@ -33,50 +176,55 @@ export function createDxfShapeStructureService(deps: {
     polygonSignedArea
   } = geometry
 
-  const {
-    buildSketchGroups,
-    extractPolygonForEntities
-  } = flattenService || {
+  const { buildSketchGroups, extractPolygonForEntities } = flattenService || {
     buildSketchGroups: () => [],
     extractPolygonForEntities: () => null
   }
 
-  const debugDXF: (phase: string, data: any) => void =
+  const debugDXF: (phase: string, data: unknown) => void =
     shapeDetectionService?.debugDXF || (() => {})
-  const buildClosedContoursFromLines: (entities: any[]) => any[] =
+  const buildClosedContoursFromLines: (entities: DxfEntity[]) => ClosedContour[] =
     shapeDetectionService?.buildClosedContoursFromLines || (() => [])
 
-  function isRenderableEntity(entity: any): boolean {
-    return !!entity?.type && !['HATCH', 'TEXT', 'MTEXT', 'DIMENSION', 'INSERT', 'POINT'].includes(entity.type)
+  function isRenderableEntity(entity: DxfEntity): boolean {
+    return (
+      !!entity?.type &&
+      !['HATCH', 'TEXT', 'MTEXT', 'DIMENSION', 'INSERT', 'POINT'].includes(entity.type)
+    )
   }
 
-  function isClosedArc(entity: any): boolean {
+  function isClosedArc(entity: DxfEntity): boolean {
     if (entity?.type !== 'ARC' || !entity.center || !Number.isFinite(entity.radius)) return false
     let span = Number.isFinite(entity.angleLength)
-      ? Math.abs(entity.angleLength)
+      ? Math.abs(entity.angleLength ?? 0)
       : Math.abs((entity.endAngle || 0) - (entity.startAngle || 0))
     while (span > TWO_PI) span -= TWO_PI
     if (span <= 0) span += TWO_PI
     return span >= TWO_PI - 1e-3
   }
 
-  function isClosedEntity(entity: any): boolean {
+  function isClosedEntity(entity: DxfEntity): boolean {
     if (!entity?.type) return false
     if (entity.type === 'CIRCLE') return true
     if (entity.type === 'ARC') return isClosedArc(entity)
-    if ((entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') && entity.vertices?.length >= 3) {
-      return entity.closed !== false
+    if (
+      (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') &&
+      entity.vertices &&
+      entity.vertices.length >= 3
+    ) {
     }
     if (entity.type === 'ELLIPSE') {
       const start = entity.startParameter ?? entity.startAngle ?? 0
       const end = entity.endParameter ?? entity.endAngle ?? TWO_PI
-      return Math.abs(Math.abs(end - start) - TWO_PI) < 1e-4 || Math.abs((end - start) % TWO_PI) < 1e-4
+      return (
+        Math.abs(Math.abs(end - start) - TWO_PI) < 1e-4 || Math.abs((end - start) % TWO_PI) < 1e-4
+      )
     }
     if (entity.type === 'SPLINE') return !!entity.closed
     return false
   }
 
-  function entityToPoints(entity: any): any[] {
+  function entityToPoints(entity: DxfEntity): ContourPoint[] {
     if (!entity?.type) return []
     switch (entity.type) {
       case 'LWPOLYLINE':
@@ -88,7 +236,12 @@ export function createDxfShapeStructureService(deps: {
         return circleToPoints(entity)
       case 'ARC':
         return isClosedArc(entity)
-          ? circleToPoints({ center: entity.center, radius: entity.radius })
+          ? circleToPoints({
+              type: 'CIRCLE',
+              center: entity.center,
+              radius: entity.radius,
+              layer: entity.layer
+            } as DxfEntity)
           : []
       case 'ELLIPSE':
         return ellipseToPoints(entity, isClosedEntity(entity))
@@ -99,7 +252,11 @@ export function createDxfShapeStructureService(deps: {
     }
   }
 
-  function containsPoint(candidate: any, point: any, eps = LOOP_TOLERANCE * 8): boolean {
+  function containsPoint(
+    candidate: ClosedContour,
+    point: ContourPoint,
+    eps = LOOP_TOLERANCE * 8
+  ): boolean {
     if (!candidate?.bbox || !point) return false
     if (!bboxContainsPoint(candidate.bbox, point, eps)) return false
     if (!candidate.points?.length) return false
@@ -123,20 +280,21 @@ export function createDxfShapeStructureService(deps: {
     return false
   }
 
-  function bboxGap(a: any, b: any): number {
+  function bboxGap(a: BoundingBox | null, b: BoundingBox | null): number {
     if (!a || !b) return Infinity
     const dx = Math.max(0, a.minX - b.maxX, b.minX - a.maxX)
     const dy = Math.max(0, a.minY - b.maxY, b.minY - a.maxY)
     return Math.hypot(dx, dy)
   }
 
-  function collectContourCandidates(entities: any[]): any[] {
+  function collectContourCandidates(entities: DxfEntity[]): ClosedContour[] {
     return entities
       .filter(isClosedEntity)
-      .map((entity, index) => {
+      .map((entity, index): ClosedContour | null => {
         const points = closePointRing(entityToPoints(entity))
         const bbox = entityBBox(entity)
-        if (!bbox || points.length < 4) return null
+        const sample = safeSamplePoint(entity) || points[0]
+        if (!bbox || points.length < 4 || !sample) return null
         const polygon = extractPolygonForEntities([entity])
         const area = polygon?.area || Math.abs(polygonSignedArea(points.slice(0, -1)))
         return {
@@ -147,19 +305,25 @@ export function createDxfShapeStructureService(deps: {
           points,
           polygonPoints: polygon?.polygonPoints || points,
           area,
-          sample: safeSamplePoint(entity) || points[0] || null,
+          sample,
           isClosed: true
         }
       })
-      .filter(candidate => candidate && candidate.area > EPS)
+      .filter((candidate): candidate is ClosedContour => {
+        return candidate !== null && candidate.area > EPS
+      })
   }
 
-  function scoreParentContour(candidate: any, entities: any[], groupBBox: any): any {
+  function scoreParentContour(
+    candidate: ClosedContour,
+    entities: DxfEntity[],
+    groupBBox: BoundingBox
+  ): ContourScore {
     let insideCount = 0
     let touchCount = 0
     let closedInsideCount = 0
 
-    entities.forEach(entity => {
+    entities.forEach((entity) => {
       if (entity === candidate.entity) return
       const probe = samplePoint(entity)
       const bbox = entityBBox(entity)
@@ -177,7 +341,9 @@ export function createDxfShapeStructureService(deps: {
     const candidateWidth = Math.max(EPS, candidate.bbox.maxX - candidate.bbox.minX)
     const candidateHeight = Math.max(EPS, candidate.bbox.maxY - candidate.bbox.minY)
     const bboxCoverage = (candidateWidth * candidateHeight) / (groupWidth * groupHeight)
-    const aspect = Math.max(candidateWidth, candidateHeight) / Math.max(EPS, Math.min(candidateWidth, candidateHeight))
+    const aspect =
+      Math.max(candidateWidth, candidateHeight) /
+      Math.max(EPS, Math.min(candidateWidth, candidateHeight))
     const stripPenalty = aspect > 20 ? 2 : aspect > 10 ? 1 : 0
 
     return {
@@ -191,7 +357,7 @@ export function createDxfShapeStructureService(deps: {
     }
   }
 
-  function compareScores(a: any, b: any): number {
+  function compareScores(a: ContourScore, b: ContourScore): number {
     // Strip penalty first: a candidate with aspect ratio > 20 (e.g. a
     // 402 x 10 bottom tab on 1161603Adaptor) must never beat a normal
     // closed outline, even when a boundary-coincidence false positive
@@ -203,51 +369,67 @@ export function createDxfShapeStructureService(deps: {
     // winning on boundary-touch counts alone.
     const coverageGap = b.bboxCoverage - a.bboxCoverage
     if (Math.abs(coverageGap) > 0.05) return coverageGap
-    if (a.closedInsideCount !== b.closedInsideCount) return b.closedInsideCount - a.closedInsideCount
+    if (a.closedInsideCount !== b.closedInsideCount)
+      return b.closedInsideCount - a.closedInsideCount
     if (a.insideCount !== b.insideCount) return b.insideCount - a.insideCount
     if (a.touchCount !== b.touchCount) return b.touchCount - a.touchCount
     if (Math.abs(a.bboxCoverage - b.bboxCoverage) > 1e-6) return b.bboxCoverage - a.bboxCoverage
     return b.area - a.area
   }
 
-  function findPeerOuterCandidates(ranked: any[]): any[] {
+  function findPeerOuterCandidates(ranked: RankedContour[]): ClosedContour[] {
     if (!ranked.length) return []
     const leader = ranked[0]
     if (!leader) return []
     return ranked
-      .filter(entry => {
+      .filter((entry) => {
         const score = entry.score
         // Peer-outers must match on strip penalty and bbox coverage tier,
         // otherwise a thin strip would be treated as a peer of the real
         // outline purely because the other counts happen to match.
-        return Math.abs(score.stripPenalty - leader.score.stripPenalty) <= 0 &&
+        return (
+          Math.abs(score.stripPenalty - leader.score.stripPenalty) <= 0 &&
           Math.abs(score.bboxCoverage - leader.score.bboxCoverage) <= 0.02 &&
           Math.abs(score.closedInsideCount - leader.score.closedInsideCount) <= 0 &&
           Math.abs(score.insideCount - leader.score.insideCount) <= 0 &&
           Math.abs(score.touchCount - leader.score.touchCount) <= 0 &&
           Math.abs(score.area - leader.score.area) <= Math.max(leader.score.area * 0.05, 1)
+        )
       })
-      .map(entry => entry.candidate)
+      .map((entry) => entry.candidate)
   }
 
-  function selectParentContour(entities: any[]): any {
+  function selectParentContour(entities: DxfEntity[]): ParentContourSelection {
     const candidates = collectContourCandidates(entities)
     if (!candidates.length) return { parentContour: null, peerOuters: [], ranked: [] }
 
-    let groupBBox = null
-    entities.forEach(entity => { groupBBox = unionBBox(groupBBox, entityBBox(entity)) })
+    let groupBBox: BoundingBox | null = null
+    entities.forEach((entity) => {
+      groupBBox = unionBBox(groupBBox, entityBBox(entity))
+    })
     if (!groupBBox) {
       const sorted = candidates.slice().sort((a, b) => b.area - a.area)
       return {
         parentContour: sorted[0] || null,
         peerOuters: sorted[0] ? [sorted[0]] : [],
-        ranked: sorted.map(candidate => ({ candidate, score: { area: candidate.area } }))
+        ranked: sorted.map((candidate) => ({
+          candidate,
+          score: {
+            insideCount: 0,
+            touchCount: 0,
+            closedInsideCount: 0,
+            bboxCoverage: 0,
+            stripPenalty: 0,
+            area: candidate.area,
+            isSynthetic: false
+          }
+        }))
       }
     }
 
-    const ranked = candidates.map(candidate => ({
+    const ranked = candidates.map((candidate) => ({
       candidate,
-      score: scoreParentContour(candidate, entities, groupBBox)
+      score: scoreParentContour(candidate, entities, groupBBox!)
     }))
     ranked.sort((a, b) => compareScores(a.score, b.score))
     const peerOuters = findPeerOuterCandidates(ranked)
@@ -256,8 +438,8 @@ export function createDxfShapeStructureService(deps: {
       entityCount: entities.length,
       candidateCount: ranked.length,
       chosenContourId: ranked[0]?.candidate?.id || null,
-      peerOuterIds: peerOuters.map(candidate => candidate.id),
-      scores: ranked.map(entry => ({
+      peerOuterIds: peerOuters.map((candidate) => candidate.id),
+      scores: ranked.map((entry) => ({
         contourId: entry.candidate.id,
         layer: entry.candidate.layer,
         score: entry.score
@@ -271,7 +453,10 @@ export function createDxfShapeStructureService(deps: {
     }
   }
 
-  function assignEntitiesToParent(parentContour: any, entities: any[]): any {
+  function assignEntitiesToParent(
+    parentContour: ClosedContour | null,
+    entities: DxfEntity[]
+  ): EntityAssignment {
     if (!parentContour) {
       return {
         ownedEntities: [...entities],
@@ -280,11 +465,11 @@ export function createDxfShapeStructureService(deps: {
       }
     }
 
-    const ownedEntities: any[] = []
-    const insideEntities: any[] = []
-    const attachedEntities: any[] = []
+    const ownedEntities: DxfEntity[] = []
+    const insideEntities: DxfEntity[] = []
+    const attachedEntities: DxfEntity[] = []
 
-    entities.forEach(entity => {
+    entities.forEach((entity) => {
       const probe = samplePoint(entity)
       const bbox = entityBBox(entity)
       const inside = probe ? containsPoint(parentContour, probe) : false
@@ -299,13 +484,13 @@ export function createDxfShapeStructureService(deps: {
     return { ownedEntities, insideEntities, attachedEntities }
   }
 
-  function pointsBBox(points: any[]): any {
+  function pointsBBox(points: ContourPoint[]): BoundingBox | null {
     if (!Array.isArray(points) || !points.length) return null
     let minX = points[0].x
     let maxX = points[0].x
     let minY = points[0].y
     let maxY = points[0].y
-    points.forEach(point => {
+    points.forEach((point) => {
       if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return
       if (point.x < minX) minX = point.x
       if (point.x > maxX) maxX = point.x
@@ -315,33 +500,35 @@ export function createDxfShapeStructureService(deps: {
     return { minX, minY, maxX, maxY }
   }
 
-  function containsPointInRing(points: any[], point: any): boolean {
+  function containsPointInRing(points: ContourPoint[], point: ContourPoint): boolean {
     if (!Array.isArray(points) || points.length < 4 || !point) return false
     const bbox = pointsBBox(points)
     if (!bbox || !bboxContainsPoint(bbox, point, LOOP_TOLERANCE * 12)) return false
     return pointInPoly(point.x, point.y, points)
   }
 
-  function polygonArea(points: any[]): number {
+  function polygonArea(points: ContourPoint[]): number {
     if (!Array.isArray(points) || points.length < 4) return 0
     return Math.abs(polygonSignedArea(points.slice(0, -1)))
   }
 
-  function bboxArea(bbox: any): number {
+  function bboxArea(bbox: BoundingBox | null): number {
     if (!bbox) return 0
     return Math.max(0, bbox.maxX - bbox.minX) * Math.max(0, bbox.maxY - bbox.minY)
   }
 
-  function groupBBox(group: any): any {
-    let bbox = null
-    ;(group?.entities || []).forEach((entity: any) => { bbox = unionBBox(bbox, entityBBox(entity)) })
+  function groupBBox(group: GroupMeta): BoundingBox | null {
+    let bbox: BoundingBox | null = null
+    ;(group?.entities || []).forEach((entity: DxfEntity) => {
+      bbox = unionBBox(bbox, entityBBox(entity))
+    })
     return bbox
   }
 
-  function splitGroupsByClosedness(groups: any[]): any[] {
-    return groups.map(entities => {
+  function splitGroupsByClosedness(groups: DxfEntity[][]): GroupMeta[] {
+    return groups.map((entities) => {
       const closedContours = collectContourCandidates(entities)
-      const openEntities = entities.filter((entity: any) => !isClosedEntity(entity))
+      const openEntities = entities.filter((entity: DxfEntity) => !isClosedEntity(entity))
       return {
         entities,
         closedContours,
@@ -352,35 +539,41 @@ export function createDxfShapeStructureService(deps: {
     })
   }
 
-  function buildEnvelopeOwnersForOpenGroups(groupMeta: any[]): any[] {
+  function buildEnvelopeOwnersForOpenGroups(groupMeta: GroupMeta[]): EnvelopeOwner[] {
     const buildRasterEnvelopes = rasterEnvelopeService?.buildRasterEnvelopes || (() => [])
 
     return groupMeta
-      .map(group => {
+      .map((group) => {
         const extracted = extractPolygonForEntities(group.entities)
-        const polygonPoints = extracted?.polygonPoints?.length
-          ? extracted.polygonPoints
-          : null
+        const polygonPoints = extracted?.polygonPoints?.length ? extracted.polygonPoints : null
         const inferredLoop = !polygonPoints
           ? buildClosedContoursFromLines(group.entities)
               .slice()
-              .sort((a: any, b: any) => polygonArea(b?.points || []) - polygonArea(a?.points || []))[0]
+              .sort(
+                (a: ClosedContour, b: ClosedContour) =>
+                  polygonArea(b?.points || []) - polygonArea(a?.points || [])
+              )[0]
           : null
-        const inferredPoints = Array.isArray(inferredLoop?.points) && inferredLoop.points.length >= 4
-          ? closePointRing(inferredLoop.points)
-          : null
-        let envelope: any = null
+        const inferredPoints =
+          Array.isArray(inferredLoop?.points) && inferredLoop.points.length >= 4
+            ? closePointRing(inferredLoop.points)
+            : null
+        let envelope: RasterEnvelope | null = null
         if (!polygonPoints && !inferredPoints && group.openCount > 0) {
-          const envelopes: any[] = buildRasterEnvelopes(group.entities, {
+          const envelopes: RasterEnvelope[] = buildRasterEnvelopes(group.entities, {
             strokeRadius: undefined,
             sampleStep: undefined,
             paddingCells: 3
           })
           envelope = envelopes
             .slice()
-            .sort((a: any, b: any) => (b.entities?.length || 0) - (a.entities?.length || 0))[0]
+            .sort(
+              (a: RasterEnvelope, b: RasterEnvelope) =>
+                (b.entities?.length || 0) - (a.entities?.length || 0)
+            )[0]
         }
-        const ownerPoints = polygonPoints ||
+        const ownerPoints =
+          polygonPoints ||
           inferredPoints ||
           (envelope?.polygonPoints?.length ? envelope.polygonPoints : null)
         return {
@@ -390,76 +583,91 @@ export function createDxfShapeStructureService(deps: {
           envelopeArea: ownerPoints ? polygonArea(ownerPoints) : 0
         }
       })
-      .filter(owner => Array.isArray(owner.envelopePoints) && owner.envelopePoints.length >= 4)
+      .filter((owner) => Array.isArray(owner.envelopePoints) && owner.envelopePoints.length >= 4)
   }
 
-  function groupProbePoints(group: any): any[] {
+  function groupProbePoints(group: GroupMeta): ContourPoint[] {
     const contourPoints = (group.closedContours || [])
-      .map((contour: any) => contour.sample || safeSamplePoint(contour.entity))
-      .filter(Boolean)
+      .map((contour: ClosedContour) => contour.sample || safeSamplePoint(contour.entity))
+      .filter((p): p is ContourPoint => p !== null)
     const openPoints = (group.openEntities || [])
-      .map((entity: any) => safeSamplePoint(entity))
-      .filter(Boolean)
+      .map((entity: DxfEntity) => safeSamplePoint(entity))
+      .filter((p): p is ContourPoint => p !== null)
     return [...contourPoints, ...openPoints]
   }
 
-  function estimateGroupArea(group: any, ownerByGroup: Map<any, any>): number {
+  function estimateGroupArea(
+    group: GroupMeta,
+    ownerByGroup: Map<GroupMeta, EnvelopeOwner>
+  ): number {
     const owner = ownerByGroup?.get(group)
-    if (owner?.envelopeArea > EPS) return owner.envelopeArea
+    if (owner?.envelopeArea && owner.envelopeArea > EPS) return owner.envelopeArea
 
-    const closedArea = (group?.closedContours || []).reduce((maxArea: number, contour: any) => {
-      const area = Math.abs(contour?.area || 0)
-      return area > maxArea ? area : maxArea
-    }, 0)
+    const closedArea = (group?.closedContours || []).reduce(
+      (maxArea: number, contour: ClosedContour) => {
+        const area = Math.abs(contour?.area || 0)
+        return area > maxArea ? area : maxArea
+      },
+      0
+    )
     if (closedArea > EPS) return closedArea
 
     return bboxArea(groupBBox(group))
   }
 
-  function ownerContainsGroup(owner: any, probes: any[]): boolean {
-    if (!owner?.envelopeBBox || !Array.isArray(owner.envelopePoints) || owner.envelopePoints.length < 4) return false
+  function ownerContainsGroup(owner: EnvelopeOwner, probes: ContourPoint[]): boolean {
+    if (
+      !owner?.envelopeBBox ||
+      !Array.isArray(owner.envelopePoints) ||
+      owner.envelopePoints.length < 4
+    )
+      return false
     if (!Array.isArray(probes) || !probes.length) return false
-    return probes.every(point =>
-      bboxContainsPoint(owner.envelopeBBox, point, LOOP_TOLERANCE * 12) &&
-      containsPointInRing(owner.envelopePoints, point)
+    return probes.every(
+      (point) =>
+        bboxContainsPoint(owner.envelopeBBox!, point, LOOP_TOLERANCE * 12) &&
+        containsPointInRing(owner.envelopePoints!, point)
     )
   }
 
-  function mergeClosedGroupsIntoOpenOwners(groupMeta: any[]): any[] {
-    if (!groupMeta.length) return groupMeta.map(group => ({
-      entities: group.entities,
-      envelopePoints: null
-    }))
+  function mergeClosedGroupsIntoOpenOwners(groupMeta: GroupMeta[]): GroupRecord[] {
+    if (!groupMeta.length)
+      return groupMeta.map((group) => ({
+        entities: group.entities,
+        envelopePoints: null
+      }))
     const openOwners = buildEnvelopeOwnersForOpenGroups(groupMeta)
     if (!openOwners.length) {
-      return groupMeta.map(group => ({
+      return groupMeta.map((group) => ({
         entities: group.entities,
         envelopePoints: null
       }))
     }
 
-    const ownerByGroup = new Map(openOwners.map(owner => [owner.group, owner]))
-    const absorbedByGroup = new Map()
-    const absorbedIdsByOwner = new Map<any, string[]>(openOwners.map(owner => [owner.group, [] as string[]]))
+    const ownerByGroup = new Map(openOwners.map((owner) => [owner.group, owner]))
+    const absorbedByGroup = new Map<GroupMeta, GroupMeta>()
+    const absorbedIdsByOwner = new Map<GroupMeta, string[]>(
+      openOwners.map((owner) => [owner.group, [] as string[]])
+    )
     const absorbedGroups = new Set()
 
     // Merge any child group whose representative points all sit inside a
     // larger open-owner envelope. This covers open-inside-open sketches, not
     // just the original closed-inside-open fallback.
     const rankedGroups = groupMeta
-      .map(group => ({
+      .map((group) => ({
         group,
         probes: groupProbePoints(group),
         area: estimateGroupArea(group, ownerByGroup)
       }))
-      .filter(entry => entry.probes.length)
+      .filter((entry) => entry.probes.length)
       .sort((a, b) => a.area - b.area)
 
     rankedGroups.forEach(({ group, probes, area }) => {
       const candidateOwners = openOwners
-        .filter(owner => owner.group !== group)
-        .filter(owner => owner.envelopeArea > Math.max(area + EPS, area * 1.02))
-        .filter(owner => ownerContainsGroup(owner, probes))
+        .filter((owner) => owner.group !== group)
+        .filter((owner) => owner.envelopeArea > Math.max(area + EPS, area * 1.02))
+        .filter((owner) => ownerContainsGroup(owner, probes))
 
       if (!candidateOwners.length) return
 
@@ -468,30 +676,32 @@ export function createDxfShapeStructureService(deps: {
       absorbedByGroup.set(group, owner.group)
       absorbedGroups.add(group)
       const ownerAbsorbedIds = absorbedIdsByOwner.get(owner.group)
-      if (ownerAbsorbedIds) ownerAbsorbedIds.push(...group.closedContours.map((contour: any) => contour.id))
+      if (ownerAbsorbedIds)
+        ownerAbsorbedIds.push(...group.closedContours.map((contour: ClosedContour) => contour.id))
     })
 
-    const resolveRootGroup = (group: any): any => {
+    const resolveRootGroup = (group: GroupMeta): GroupMeta => {
       let current = group
       const seen = new Set([current])
       while (absorbedByGroup.has(current)) {
-        current = absorbedByGroup.get(current)
-        if (!current || seen.has(current)) break
+        const next = absorbedByGroup.get(current)
+        if (!next || seen.has(next)) break
+        current = next
         seen.add(current)
       }
       return current
     }
 
-    const mergedEntitiesByRoot = new Map()
-    groupMeta.forEach(group => {
+    const mergedEntitiesByRoot = new Map<GroupMeta, DxfEntity[]>()
+    groupMeta.forEach((group) => {
       const root = resolveRootGroup(group)
       const current = mergedEntitiesByRoot.get(root) || []
       current.push(...group.entities)
       mergedEntitiesByRoot.set(root, current)
     })
 
-    const outputGroups: any[] = []
-    groupMeta.forEach(group => {
+    const outputGroups: GroupRecord[] = []
+    groupMeta.forEach((group) => {
       if (absorbedGroups.has(group)) return
       const owner = ownerByGroup.get(group)
       outputGroups.push({
@@ -503,7 +713,10 @@ export function createDxfShapeStructureService(deps: {
     return outputGroups
   }
 
-  function shouldRecoverEnvelopeParent(groupEntities: any[], contourSelection: any): boolean {
+  function shouldRecoverEnvelopeParent(
+    groupEntities: DxfEntity[],
+    contourSelection: ParentContourSelection
+  ): boolean {
     const parentContour = contourSelection?.parentContour || null
     const ranked = contourSelection?.ranked || []
     const peerOuters = contourSelection?.peerOuters || []
@@ -519,31 +732,42 @@ export function createDxfShapeStructureService(deps: {
     return clearLeader && dominantCoverage && strongAttachment
   }
 
-  function buildShapeRecord(groupRecord: any, index: number): any {
+  function buildShapeRecord(groupRecord: GroupRecord, index: number): DetectedShape {
     const groupEntities = groupRecord.entities || []
-    const hasEnvelopeParent = Array.isArray(groupRecord.envelopePoints) && groupRecord.envelopePoints.length >= 4
+    const hasEnvelopeParent =
+      Array.isArray(groupRecord.envelopePoints) && groupRecord.envelopePoints.length >= 4
     const recoveredContourSelection = hasEnvelopeParent ? selectParentContour(groupEntities) : null
-    const recoverEnvelopeParent = hasEnvelopeParent && shouldRecoverEnvelopeParent(groupEntities, recoveredContourSelection)
-    const contourSelection = hasEnvelopeParent && !recoverEnvelopeParent
-      ? { parentContour: null, peerOuters: [], ranked: [] }
-      : (recoveredContourSelection || selectParentContour(groupEntities))
+    const recoverEnvelopeParent =
+      hasEnvelopeParent && shouldRecoverEnvelopeParent(groupEntities, recoveredContourSelection!)
+    const contourSelection =
+      hasEnvelopeParent && !recoverEnvelopeParent
+        ? { parentContour: null, peerOuters: [], ranked: [] }
+        : recoveredContourSelection || selectParentContour(groupEntities)
     const parentContour = contourSelection.parentContour
     const peerOuters = contourSelection.peerOuters || []
     const usePeerOuters = !hasEnvelopeParent && peerOuters.length > 1
     const assignment = assignEntitiesToParent(parentContour, groupEntities)
-    const singleClearParent = !hasEnvelopeParent && !usePeerOuters && contourSelection.ranked?.length === 1 && !!parentContour
-    const ownedEntities = (hasEnvelopeParent || usePeerOuters || singleClearParent)
-      ? groupEntities
-      : assignment.ownedEntities
-    let bbox = null
-    ownedEntities.forEach((entity: any) => { bbox = unionBBox(bbox, entityBBox(entity)) })
+    const singleClearParent =
+      !hasEnvelopeParent &&
+      !usePeerOuters &&
+      contourSelection.ranked?.length === 1 &&
+      !!parentContour
+    const ownedEntities =
+      hasEnvelopeParent || usePeerOuters || singleClearParent
+        ? groupEntities
+        : assignment.ownedEntities
+    let bbox: BoundingBox | null = null
+    ownedEntities.forEach((entity: DxfEntity) => {
+      bbox = unionBBox(bbox, entityBBox(entity))
+    })
 
-    const childClosedContours = collectContourCandidates(ownedEntities)
-      .filter(candidate => !peerOuters.some((peer: any) => peer.id === candidate.id))
-    const openEntities = ownedEntities.filter((entity: any) => !isClosedEntity(entity))
+    const childClosedContours = collectContourCandidates(ownedEntities).filter(
+      (candidate) => !peerOuters.some((peer: ClosedContour) => peer.id === candidate.id)
+    )
+    const openEntities = ownedEntities.filter((entity: DxfEntity) => !isClosedEntity(entity))
     const fallbackPolygon = groupRecord.envelopePoints?.length ? groupRecord.envelopePoints : null
     const primaryPolygon = usePeerOuters
-      ? (extractPolygonForEntities(ownedEntities)?.polygonPoints || null)
+      ? extractPolygonForEntities(ownedEntities)?.polygonPoints || null
       : parentContour?.polygonPoints || null
 
     return {
@@ -561,28 +785,33 @@ export function createDxfShapeStructureService(deps: {
     }
   }
 
-  function buildShapeGroupRecords(entities: any[], options: any = {}): any {
+  function buildShapeGroupRecords(
+    entities: DxfEntity[],
+    options: DetectionOptions = {}
+  ): { renderableEntities: DxfEntity[]; groupRecords: GroupRecord[] } {
     const renderableEntities = (entities || []).filter(isRenderableEntity)
     if (!renderableEntities.length) return { renderableEntities: [], groupRecords: [] }
 
     const initialGroups = options.singleSketch
       ? [renderableEntities]
       : buildSketchGroups(renderableEntities)
-    const groupRecords = options.singleSketch
-      ? initialGroups
+    const groupRecords: GroupRecord[] = options.singleSketch
+      ? initialGroups.map((entities) => ({ entities, envelopePoints: null }))
       : mergeClosedGroupsIntoOpenOwners(splitGroupsByClosedness(initialGroups))
 
     return { renderableEntities, groupRecords }
   }
 
-  function detectShapeGroups(entities: any[], options: any = {}): any[] {
-    return buildShapeGroupRecords(entities, options).groupRecords.map((group: any) => group.entities)
+  function detectShapeGroups(entities: DxfEntity[], options: DetectionOptions = {}): DxfEntity[][] {
+    return buildShapeGroupRecords(entities, options).groupRecords.map(
+      (group: GroupRecord) => group.entities
+    )
   }
 
-  function detectShapes(entities: any[], options: any = {}): any[] {
+  function detectShapes(entities: DxfEntity[], options: DetectionOptions = {}): DetectedShape[] {
     const { groupRecords } = buildShapeGroupRecords(entities, options)
     const shapes = groupRecords
-      .map((groupRecord: any, index: number) => buildShapeRecord(groupRecord, index))
+      .map((groupRecord: GroupRecord, index: number) => buildShapeRecord(groupRecord, index))
       .filter(Boolean)
 
     return shapes

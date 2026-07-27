@@ -1,31 +1,38 @@
 /* ── Reset & base ──────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
-  --bg:           #0f1117;
-  --surface:      #171a24;
-  --surface2:     #1e21305c;
-  --surface3:     #252a3a;
-  --border:       #2a2f42;
+  --bg: #0f1117;
+  --surface: #171a24;
+  --surface2: #1e21305c;
+  --surface3: #252a3a;
+  --border: #2a2f42;
   --border-light: #343a52;
-  --text:         #e2e6f0;
-  --text-muted:   #6b7394;
-  --text-dim:     #9099b8;
-  --accent:       #4f8ef7;
+  --text: #e2e6f0;
+  --text-muted: #6b7394;
+  --text-dim: #9099b8;
+  --accent: #4f8ef7;
   --accent-hover: #6ba0ff;
-  --accent-glow:  rgba(79,142,247,.18);
-  --danger:       #f75f5f;
-  --success:      #4fcf8e;
-  --warning:      #f7c34f;
-  --radius:       8px;
-  --radius-sm:    5px;
-  --sidebar-w:    240px;
-  --topbar-h:     52px;
+  --accent-glow: rgba(79, 142, 247, 0.18);
+  --danger: #f75f5f;
+  --success: #4fcf8e;
+  --warning: #f7c34f;
+  --radius: 8px;
+  --radius-sm: 5px;
+  --sidebar-w: 240px;
+  --topbar-h: 52px;
   --traffic-safe: 84px;
   font-size: 13px;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
@@ -57,9 +64,26 @@ html, body {
   z-index: 10;
 }
 
-.topbar-left  { flex: 1; display: none; align-items: center; min-width: 0; }
-.topbar-center { display: flex; align-items: center; justify-content: center; position: absolute; left: 50%; transform: translateX(-50%); }
-.topbar-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; }
+.topbar-left {
+  flex: 1;
+  display: none;
+  align-items: center;
+  min-width: 0;
+}
+.topbar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.topbar-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 
 body.platform-win .topbar-left,
 body.platform-linux .topbar-left {
@@ -109,7 +133,9 @@ body.platform-linux .linux-menubar {
   color: var(--text-dim);
   font-size: 12.5px;
   cursor: pointer;
-  transition: background .12s, color .12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .linux-menu-btn:hover,
@@ -126,7 +152,7 @@ body.platform-linux .linux-menubar {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 18px 40px rgba(0,0,0,.45);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
 .linux-menu-item {
@@ -140,11 +166,13 @@ body.platform-linux .linux-menubar {
   font-size: 13px;
   text-align: left;
   cursor: pointer;
-  transition: background .12s, color .12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .linux-menu-item:hover {
-  background: rgba(79,142,247,.12);
+  background: rgba(79, 142, 247, 0.12);
 }
 
 .linux-menu-separator {
@@ -175,7 +203,7 @@ body.platform-linux .linux-menubar {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
   text-align: center;
 }
 
@@ -207,8 +235,8 @@ body.platform-linux .linux-menubar {
   align-items: center;
   justify-content: center;
   border-radius: 18px;
-  background: rgba(79,142,247,.12);
-  box-shadow: inset 0 0 0 1px rgba(79,142,247,.14);
+  background: rgba(79, 142, 247, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(79, 142, 247, 0.14);
 }
 
 .linux-about-name {
@@ -246,9 +274,9 @@ body.platform-linux .linux-menubar {
 .linux-about-btn {
   height: 32px;
   padding: 0 14px;
-  border: 1px solid rgba(79,142,247,.28);
+  border: 1px solid rgba(79, 142, 247, 0.28);
   border-radius: 999px;
-  background: rgba(79,142,247,.15);
+  background: rgba(79, 142, 247, 0.15);
   color: #dce9ff;
   font-size: 12px;
   font-weight: 600;
@@ -256,8 +284,8 @@ body.platform-linux .linux-menubar {
 }
 
 .linux-about-btn:hover {
-  background: rgba(79,142,247,.24);
-  border-color: rgba(79,142,247,.42);
+  background: rgba(79, 142, 247, 0.24);
+  border-color: rgba(79, 142, 247, 0.42);
 }
 
 /* Run controls */
@@ -282,14 +310,19 @@ body.platform-linux .linux-menubar {
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: background .15s, color .15s, opacity .15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    opacity 0.15s;
 }
 
 .start-btn {
   background: var(--accent);
   color: #fff;
 }
-.start-btn:hover { background: var(--accent-hover); }
+.start-btn:hover {
+  background: var(--accent-hover);
+}
 .start-btn.running {
   background: var(--surface3);
   color: var(--text-muted);
@@ -302,14 +335,17 @@ body.platform-linux .linux-menubar {
   border: 1px solid var(--border) !important;
 }
 .stop-btn:not(:disabled):hover {
-  background: rgba(247,95,95,.12);
+  background: rgba(247, 95, 95, 0.12);
   color: var(--danger);
   border-color: var(--danger) !important;
 }
-.stop-btn:disabled { opacity: .35; cursor: default; }
+.stop-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 .stop-btn.active {
   color: var(--danger);
-  border-color: rgba(247,95,95,.4) !important;
+  border-color: rgba(247, 95, 95, 0.4) !important;
   opacity: 1;
 }
 
@@ -330,21 +366,41 @@ body.platform-linux .linux-menubar {
   background: var(--surface3);
   border: 1px solid var(--border);
 }
-.status-label { font-size: 11.5px; color: var(--text-dim); font-weight: 500; }
+.status-label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
 
 .status-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
 }
-.status-dot.idle    { background: var(--text-muted); }
-.status-dot.running { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
-.status-dot.done    { background: var(--success); }
-.status-dot.error   { background: var(--danger); }
+.status-dot.idle {
+  background: var(--text-muted);
+}
+.status-dot.running {
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.status-dot.done {
+  background: var(--success);
+}
+.status-dot.error {
+  background: var(--danger);
+}
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: .55; transform: scale(.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
 }
 
 /* Icon buttons */
@@ -359,11 +415,19 @@ body.platform-linux .linux-menubar {
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  transition: background .15s, color .15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   -webkit-app-region: no-drag;
 }
-.icon-btn:hover { background: var(--surface3); color: var(--text); }
-.icon-btn.active { color: var(--accent); background: var(--accent-glow); }
+.icon-btn:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
+.icon-btn.active {
+  color: var(--accent);
+  background: var(--accent-glow);
+}
 
 .icon-btn-sm {
   display: flex;
@@ -376,9 +440,14 @@ body.platform-linux .linux-menubar {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: background .15s, color .15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
-.icon-btn-sm:hover { background: var(--surface3); color: var(--text); }
+.icon-btn-sm:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
 
 /* Feedback banner */
 .feedback-banner {
@@ -387,8 +456,8 @@ body.platform-linux .linux-menubar {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
-  background: linear-gradient(90deg, rgba(79,142,247,.16), rgba(79,142,247,.08));
-  border-bottom: 1px solid rgba(79,142,247,.22);
+  background: linear-gradient(90deg, rgba(79, 142, 247, 0.16), rgba(79, 142, 247, 0.08));
+  border-bottom: 1px solid rgba(79, 142, 247, 0.22);
 }
 
 .feedback-banner[hidden] {
@@ -413,7 +482,7 @@ body.platform-linux .linux-menubar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(79,142,247,.28);
+  border: 1px solid rgba(79, 142, 247, 0.28);
   -webkit-app-region: no-drag;
 }
 
@@ -421,17 +490,20 @@ body.platform-linux .linux-menubar {
   height: 30px;
   padding: 0 12px;
   border-radius: 999px;
-  background: rgba(79,142,247,.18);
+  background: rgba(79, 142, 247, 0.18);
   color: #dce9ff;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background .15s, border-color .15s, color .15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .feedback-banner-btn:hover {
-  background: rgba(79,142,247,.28);
-  border-color: rgba(79,142,247,.44);
+  background: rgba(79, 142, 247, 0.28);
+  border-color: rgba(79, 142, 247, 0.44);
   color: #fff;
 }
 
@@ -442,13 +514,16 @@ body.platform-linux .linux-menubar {
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  transition: background .15s, color .15s, border-color .15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .feedback-banner-close:hover {
-  background: rgba(255,255,255,.06);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text);
-  border-color: rgba(79,142,247,.4);
+  border-color: rgba(79, 142, 247, 0.4);
 }
 
 /* ── App body ──────────────────────────────────────────── */
@@ -497,12 +572,15 @@ body.platform-linux .linux-menubar {
 .sidebar-section-title {
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
-.sidebar-actions { display: flex; gap: 4px; }
+.sidebar-actions {
+  display: flex;
+  gap: 4px;
+}
 
 /* Drop zone */
 .drop-zone {
@@ -516,20 +594,31 @@ body.platform-linux .linux-menubar {
   gap: 5px;
   color: var(--text-muted);
   font-size: 11px;
-  transition: border-color .15s, background .15s, color .15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
   cursor: pointer;
   flex: 0 0 auto;
 }
-.drop-zone:hover, .drop-zone.drag-over {
+.drop-zone:hover,
+.drop-zone.drag-over {
   border-color: var(--accent);
   background: var(--accent-glow);
   color: var(--accent);
 }
-.drop-icon { opacity: .45; transition: opacity .15s; }
-.drop-zone:hover .drop-icon, .drop-zone.drag-over .drop-icon { opacity: .8; }
+.drop-icon {
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.drop-zone:hover .drop-icon,
+.drop-zone.drag-over .drop-icon {
+  opacity: 0.8;
+}
 
 /* File list */
-.file-list, .sheet-list {
+.file-list,
+.sheet-list {
   list-style: none;
   overflow-y: auto;
   flex: 1;
@@ -550,17 +639,19 @@ body.platform-linux .linux-menubar {
   padding: 7px 8px 7px 8px;
   border-radius: var(--radius-sm);
   cursor: default;
-  transition: background .12s;
+  transition: background 0.12s;
   position: relative;
 }
-.file-item:hover { background: var(--surface2); }
+.file-item:hover {
+  background: var(--surface2);
+}
 
 .file-icon {
   width: 28px;
   height: 28px;
   border-radius: 4px;
-  background: rgba(79,142,247,.12);
-  border: 1px solid rgba(79,142,247,.2);
+  background: rgba(79, 142, 247, 0.12);
+  border: 1px solid rgba(79, 142, 247, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -568,10 +659,13 @@ body.platform-linux .linux-menubar {
   font-size: 8px;
   font-weight: 700;
   color: var(--accent);
-  letter-spacing: .04em;
+  letter-spacing: 0.04em;
 }
 
-.file-info { flex: 1; min-width: 0; }
+.file-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .file-name {
   font-size: 12px;
@@ -595,7 +689,7 @@ body.platform-linux .linux-menubar {
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
-  transition: opacity .12s;
+  transition: opacity 0.12s;
 }
 /* .file-item:hover .file-qty-total { opacity: 0; } */
 
@@ -617,10 +711,13 @@ body.platform-linux .linux-menubar {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background .12s;
+  transition: background 0.12s;
   line-height: 1;
 }
-.qty-btn:hover { background: var(--border-light); color: var(--text); }
+.qty-btn:hover {
+  background: var(--border-light);
+  color: var(--text);
+}
 .qty-value {
   font-size: 12px;
   font-weight: 600;
@@ -646,10 +743,16 @@ body.platform-linux .linux-menubar {
   justify-content: center;
   cursor: pointer;
   opacity: 0;
-  transition: opacity .12s, background .12s, color .12s;
+  transition:
+    opacity 0.12s,
+    background 0.12s,
+    color 0.12s;
 }
 /* .file-item:hover .file-remove { opacity: 1; } */
-.file-remove:hover { background: rgba(247,95,95,.15); color: var(--danger); }
+.file-remove:hover {
+  background: rgba(247, 95, 95, 0.15);
+  color: var(--danger);
+}
 
 /* Sheet list */
 .sheet-item {
@@ -658,25 +761,32 @@ body.platform-linux .linux-menubar {
   gap: 8px;
   padding: 7px 32px 7px 8px;
   border-radius: var(--radius-sm);
-  transition: background .12s;
+  transition: background 0.12s;
   position: relative;
 }
-.sheet-item:hover { background: var(--surface2); }
-.sheet-item:hover .file-remove { opacity: 1; }
+.sheet-item:hover {
+  background: var(--surface2);
+}
+.sheet-item:hover .file-remove {
+  opacity: 1;
+}
 
 .sheet-icon {
   width: 28px;
   height: 28px;
   border-radius: 4px;
-  background: rgba(79,207,142,.1);
-  border: 1px solid rgba(79,207,142,.2);
+  background: rgba(79, 207, 142, 0.1);
+  border: 1px solid rgba(79, 207, 142, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.sheet-info { flex: 1; min-width: 0; }
+.sheet-info {
+  flex: 1;
+  min-width: 0;
+}
 .sheet-dims {
   font-size: 12px;
   font-weight: 500;
@@ -743,11 +853,16 @@ body.platform-linux .linux-menubar {
   cursor: pointer;
   border: none;
   background: transparent;
-  transition: background .12s, color .12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
   flex: 0 0 auto;
   white-space: nowrap;
 }
-.canvas-tab:hover { background: var(--surface2); color: var(--text); }
+.canvas-tab:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
 .canvas-tab.active {
   background: var(--surface3);
   color: var(--text);
@@ -801,10 +916,21 @@ body.platform-linux .linux-menubar {
   text-align: center;
   pointer-events: none;
 }
-.empty-icon { opacity: .3; }
-.empty-title { font-size: 15px; font-weight: 600; color: var(--text-dim); }
-.empty-sub { font-size: 12.5px; line-height: 1.5; }
-.empty-sub strong { color: var(--text-dim); }
+.empty-icon {
+  opacity: 0.3;
+}
+.empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.empty-sub {
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.empty-sub strong {
+  color: var(--text-dim);
+}
 
 .svg-container {
   position: relative;
@@ -837,7 +963,10 @@ body.platform-linux .linux-menubar {
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: background .15s, color .15s, border-color .15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .canvas-statusbar-icon {
@@ -850,14 +979,14 @@ body.platform-linux .linux-menubar {
 
 .canvas-statusbar.error {
   color: #ffd8d8;
-  background: rgba(247,95,95,.12);
-  border-top-color: rgba(247,95,95,.35);
+  background: rgba(247, 95, 95, 0.12);
+  border-top-color: rgba(247, 95, 95, 0.35);
 }
 
 .canvas-statusbar.warning {
   color: #fff0cf;
-  background: rgba(247,195,79,.12);
-  border-top-color: rgba(247,195,79,.35);
+  background: rgba(247, 195, 79, 0.12);
+  border-top-color: rgba(247, 195, 79, 0.35);
 }
 
 .canvas-statusbar.error .canvas-statusbar-icon {
@@ -880,7 +1009,7 @@ body.platform-linux .linux-menubar {
   z-index: 1000;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .2s;
+  transition: opacity 0.2s;
 }
 .modal-overlay.open {
   opacity: 1;
@@ -897,12 +1026,16 @@ body.platform-linux .linux-menubar {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 24px 60px rgba(0,0,0,.6);
-  transform: translateY(10px) scale(.98);
-  transition: transform .2s;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  transform: translateY(10px) scale(0.98);
+  transition: transform 0.2s;
 }
-.modal-overlay.open .modal { transform: translateY(0) scale(1); }
-.modal.modal-sm { width: 360px; }
+.modal-overlay.open .modal {
+  transform: translateY(0) scale(1);
+}
+.modal.modal-sm {
+  width: 360px;
+}
 
 .modal-header {
   display: flex;
@@ -911,18 +1044,29 @@ body.platform-linux .linux-menubar {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
 }
-.modal-title { font-size: 14px; font-weight: 600; }
+.modal-title {
+  font-size: 14px;
+  font-weight: 600;
+}
 .modal-close {
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border-radius: 5px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .12s, color .12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
-.modal-close:hover { background: var(--surface3); color: var(--text); }
+.modal-close:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
 
 .modal-body {
   flex: 1;
@@ -939,7 +1083,7 @@ body.platform-linux .linux-menubar {
 .settings-section-title {
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: .01em;
+  letter-spacing: 0.01em;
   color: var(--text-muted);
   margin-bottom: 12px;
 }
@@ -951,7 +1095,9 @@ body.platform-linux .linux-menubar {
   margin-bottom: 10px;
   gap: 12px;
 }
-.setting-row:last-child { margin-bottom: 0; }
+.setting-row:last-child {
+  margin-bottom: 0;
+}
 .setting-row label:first-child {
   font-size: 13px;
   color: var(--text-dim);
@@ -976,7 +1122,7 @@ body.platform-linux .linux-menubar {
   width: 72px;
   text-align: right;
 }
-.modal-body .input-with-unit input[type="number"] {
+.modal-body .input-with-unit input[type='number'] {
   width: 84px;
   text-align: left;
   padding-left: 10px;
@@ -990,7 +1136,7 @@ body.platform-linux .linux-menubar {
 }
 
 .modal-body select,
-.modal-body input[type="text"] {
+.modal-body input[type='text'] {
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -998,13 +1144,19 @@ body.platform-linux .linux-menubar {
   font-size: 13px;
   padding: 5px 10px;
   outline: none;
-  transition: border-color .12s, box-shadow .12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
-.modal-body select { padding-right: 28px; appearance: none; cursor: pointer; }
+.modal-body select {
+  padding-right: 28px;
+  appearance: none;
+  cursor: pointer;
+}
 .modal-body select:focus,
-.modal-body input[type="text"]:focus {
+.modal-body input[type='text']:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(79,142,247,.14);
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.14);
 }
 .platform-linux .custom-select {
   position: relative;
@@ -1034,7 +1186,10 @@ body.platform-linux .linux-menubar {
   min-height: 31px;
   outline: none;
   cursor: pointer;
-  transition: border-color .12s, box-shadow .12s, background .12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
 }
 .platform-linux .custom-select-trigger:hover {
   background: var(--surface3);
@@ -1042,7 +1197,7 @@ body.platform-linux .linux-menubar {
 .platform-linux .custom-select-trigger:focus,
 .platform-linux .custom-select.open .custom-select-trigger {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(79,142,247,.14);
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.14);
 }
 .platform-linux .custom-select-label {
   overflow: hidden;
@@ -1066,7 +1221,7 @@ body.platform-linux .linux-menubar {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 18px 40px rgba(0,0,0,.45);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 .platform-linux .custom-select-option {
   border: none;
@@ -1077,46 +1232,66 @@ body.platform-linux .linux-menubar {
   font-size: 13px;
   padding: 7px 10px;
   cursor: pointer;
-  transition: background .12s, color .12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 .platform-linux .custom-select-option:hover:not(:disabled),
 .platform-linux .custom-select-option.selected {
-  background: rgba(79,142,247,.12);
+  background: rgba(79, 142, 247, 0.12);
   color: var(--text);
 }
 .platform-linux .custom-select-option:disabled {
-  opacity: .45;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .input-with-unit:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(79,142,247,.14);
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.14);
 }
-.modal-body input[type="text"] { flex: 1; }
+.modal-body input[type='text'] {
+  flex: 1;
+}
 
 /* Toggle */
-.toggle { position: relative; display: inline-block; width: 36px; height: 20px; cursor: pointer; }
-.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
 .toggle-track {
   position: absolute;
   inset: 0;
   background: var(--surface3);
   border-radius: 20px;
   border: 1px solid var(--border);
-  transition: background .2s, border-color .2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 .toggle-track::after {
   content: '';
   position: absolute;
-  width: 14px; height: 14px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--text-muted);
-  top: 2px; left: 2px;
-  transition: transform .2s, background .2s;
+  top: 2px;
+  left: 2px;
+  transition:
+    transform 0.2s,
+    background 0.2s;
 }
 .toggle input:checked + .toggle-track {
-  background: rgba(79,142,247,.25);
-  border-color: rgba(79,142,247,.5);
+  background: rgba(79, 142, 247, 0.25);
+  border-color: rgba(79, 142, 247, 0.5);
 }
 .toggle input:checked + .toggle-track::after {
   transform: translateX(16px);
@@ -1138,7 +1313,10 @@ body.platform-linux .linux-menubar {
   color: var(--text-dim);
   font-size: 11.5px;
   cursor: pointer;
-  transition: border-color .12s, background .12s, color .12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
   text-align: center;
 }
 .preset-btn:hover {
@@ -1147,10 +1325,10 @@ body.platform-linux .linux-menubar {
   color: var(--accent);
 }
 .preset-btn.active {
-  border-color: rgba(79,142,247,.55);
-  background: rgba(79,142,247,.12);
+  border-color: rgba(79, 142, 247, 0.55);
+  background: rgba(79, 142, 247, 0.12);
   color: var(--text);
-  box-shadow: inset 0 0 0 1px rgba(79,142,247,.2);
+  box-shadow: inset 0 0 0 1px rgba(79, 142, 247, 0.2);
 }
 
 .sheet-field-head {
@@ -1161,7 +1339,7 @@ body.platform-linux .linux-menubar {
   color: var(--text-muted);
   font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
 }
 
 .sheet-dims-row {
@@ -1169,17 +1347,24 @@ body.platform-linux .linux-menubar {
   align-items: center;
   gap: 8px;
 }
-.dims-sep { color: var(--text-muted); font-size: 15px; font-weight: 300; }
-.sheet-dims-row .input-with-unit { flex: 1; }
-.sheet-dims-row .input-with-unit input { width: 100%; }
+.dims-sep {
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 300;
+}
+.sheet-dims-row .input-with-unit {
+  flex: 1;
+}
+.sheet-dims-row .input-with-unit input {
+  width: 100%;
+}
 .sheet-help {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background:
-    linear-gradient(180deg, rgba(79,142,247,.08), rgba(79,142,247,0)) ,
-    var(--surface2);
+    linear-gradient(180deg, rgba(79, 142, 247, 0.08), rgba(79, 142, 247, 0)), var(--surface2);
   color: var(--text-muted);
   font-size: 11.5px;
   line-height: 1.45;
@@ -1198,23 +1383,34 @@ body.platform-linux .linux-menubar {
   border-top: 1px solid var(--border);
 }
 
-.btn-primary, .btn-secondary {
+.btn-primary,
+.btn-secondary {
   padding: 7px 18px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   border: none;
-  transition: background .12s, opacity .12s;
+  transition:
+    background 0.12s,
+    opacity 0.12s;
 }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
 .btn-secondary {
   background: var(--surface2);
   color: var(--text-dim);
   border: 1px solid var(--border);
 }
-.btn-secondary:hover { background: var(--surface3); color: var(--text); }
+.btn-secondary:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
 
 .pvw-remove-part-btn {
   display: inline-flex;
@@ -1228,32 +1424,49 @@ body.platform-linux .linux-menubar {
   background: var(--surface3);
   position: absolute;
   bottom: 0;
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   z-index: 5;
   overflow: hidden;
   display: none;
 }
-.progress-bar-wrap.visible { display: block; }
+.progress-bar-wrap.visible {
+  display: block;
+}
 .progress-bar-fill {
   height: 100%;
   background: var(--accent);
   width: 0%;
-  transition: width .4s ease;
+  transition: width 0.4s ease;
 }
 .progress-bar-fill.indeterminate {
   width: 30%;
   animation: indeterminate 1.4s infinite ease-in-out;
 }
 @keyframes indeterminate {
-  0%   { transform: translateX(-150%); }
-  100% { transform: translateX(450%); }
+  0% {
+    transform: translateX(-150%);
+  }
+  100% {
+    transform: translateX(450%);
+  }
 }
 
 /* ── Scrollbars ────────────────────────────────────────── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
 
 /* ═══════════════════════════════════════════════════════════
    DXF PREVIEW DIALOG
@@ -1271,7 +1484,9 @@ body.platform-linux .linux-menubar {
 }
 
 /* Header */
-.pvw-header { gap: 0; }
+.pvw-header {
+  gap: 0;
+}
 
 .pvw-file-info {
   display: flex;
@@ -1283,15 +1498,15 @@ body.platform-linux .linux-menubar {
   width: 38px;
   height: 38px;
   border-radius: 7px;
-  background: rgba(79,142,247,.12);
-  border: 1px solid rgba(79,142,247,.25);
+  background: rgba(79, 142, 247, 0.12);
+  border: 1px solid rgba(79, 142, 247, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 9px;
   font-weight: 800;
   color: var(--accent);
-  letter-spacing: .05em;
+  letter-spacing: 0.05em;
   flex-shrink: 0;
 }
 
@@ -1325,7 +1540,10 @@ body.platform-linux .linux-menubar {
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background .12s, color .12s, border-color .12s;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
   white-space: nowrap;
 }
 .pvw-tab:hover {
@@ -1376,7 +1594,7 @@ body.platform-linux .linux-menubar {
 
 .pvw-canvas-wrap {
   flex: 1;
-  overflow: auto;          /* both axes — key for large DXF files */
+  overflow: auto; /* both axes — key for large DXF files */
   background: #0d0f18;
   cursor: crosshair;
   position: relative;
@@ -1407,7 +1625,8 @@ body.platform-linux .linux-menubar {
 }
 
 .pvw-bar-sep {
-  width: 1px; height: 16px;
+  width: 1px;
+  height: 16px;
   background: var(--border);
   margin: 0 4px;
 }
@@ -1419,7 +1638,10 @@ body.platform-linux .linux-menubar {
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  transition: width .2s, min-width .2s, opacity .15s;
+  transition:
+    width 0.2s,
+    min-width 0.2s,
+    opacity 0.15s;
   min-height: 0;
 }
 
@@ -1453,7 +1675,7 @@ body.platform-linux .linux-menubar {
   font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .07em;
+  letter-spacing: 0.07em;
   color: var(--text-muted);
 }
 
@@ -1482,7 +1704,7 @@ body.platform-linux .linux-menubar {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
 }
 
@@ -1502,21 +1724,23 @@ body.platform-linux .linux-menubar {
   margin: 0 6px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background .12s;
+  transition: background 0.12s;
   border: 1px solid transparent;
 }
-.pvw-shape-row:hover { background: var(--surface2); }
+.pvw-shape-row:hover {
+  background: var(--surface2);
+}
 .pvw-shape-row.selected {
   background: var(--surface2);
   border-color: var(--accent);
 }
 .pvw-shape-row.dimmed {
   opacity: 0.5;
-  background: rgba(255,255,255,0.02);
+  background: rgba(255, 255, 255, 0.02);
 }
 .pvw-shape-row.dimmed.selected {
   opacity: 0.8;
-  border-color: rgba(255,255,255,0.28);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .pvw-thumb {
@@ -1575,11 +1799,15 @@ body.platform-linux .linux-menubar {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: background .12s, color .12s, border-color .12s, opacity .12s;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s,
+    opacity 0.12s;
 }
 .pvw-remove-selected:hover:not(:disabled) {
-  background: rgba(247,95,95,.12);
-  border-color: rgba(247,95,95,.28);
+  background: rgba(247, 95, 95, 0.12);
+  border-color: rgba(247, 95, 95, 0.28);
   color: var(--danger);
 }
 .pvw-remove-selected:disabled {
@@ -1609,7 +1837,7 @@ body.platform-linux .linux-menubar {
 .pvw-controls .qty-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(79,142,247,.14);
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.14);
 }
 
 .pvw-controls .qty-input::-webkit-outer-spin-button,
@@ -1632,13 +1860,23 @@ body.platform-linux .linux-menubar {
 }
 
 /* Make sidebar file items feel clickable */
-.file-item { cursor: pointer; }
-.file-item:hover .file-name { color: var(--accent); }
+.file-item {
+  cursor: pointer;
+}
+.file-item:hover .file-name {
+  color: var(--accent);
+}
 
 /* ── Export Modal ──────────────────────────────────────── */
-.modal-export { width: 640px; }
+.modal-export {
+  width: 640px;
+}
 
-.export-modal-body { padding: 0; display: flex; flex-direction: column; }
+.export-modal-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 .export-summary-bar {
   display: flex;
@@ -1655,8 +1893,12 @@ body.platform-linux .linux-menubar {
   flex: 1;
   padding: 0 16px;
 }
-.export-summary-item:first-child { padding-left: 0; }
-.export-summary-item:last-child { padding-right: 0; }
+.export-summary-item:first-child {
+  padding-left: 0;
+}
+.export-summary-item:last-child {
+  padding-right: 0;
+}
 .export-summary-label {
   font-size: 10px;
   text-transform: uppercase;
@@ -1669,7 +1911,9 @@ body.platform-linux .linux-menubar {
   color: var(--text);
   line-height: 1;
 }
-.export-summary-value.accent { color: var(--success); }
+.export-summary-value.accent {
+  color: var(--success);
+}
 .export-summary-sep {
   width: 1px;
   height: 32px;
@@ -1698,24 +1942,33 @@ body.platform-linux .linux-menubar {
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border);
 }
-.export-table thead th:first-child { padding-left: 0; }
+.export-table thead th:first-child {
+  padding-left: 0;
+}
 .export-table tbody tr {
   border-bottom: 1px solid var(--border);
   transition: background 0.1s;
 }
-.export-table tbody tr:last-child { border-bottom: none; }
-.export-table tbody tr:hover { background: var(--surface2); }
+.export-table tbody tr:last-child {
+  border-bottom: none;
+}
+.export-table tbody tr:hover {
+  background: var(--surface2);
+}
 .export-table tbody td {
   padding: 9px 10px;
   color: var(--text);
   vertical-align: middle;
 }
-.export-table tbody td:first-child { padding-left: 0; }
+.export-table tbody td:first-child {
+  padding-left: 0;
+}
 .export-sheet-num {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px; height: 22px;
+  width: 22px;
+  height: 22px;
   border-radius: 5px;
   background: var(--surface3);
   font-size: 11px;
@@ -1741,9 +1994,18 @@ body.platform-linux .linux-menubar {
   background: var(--success);
   transition: width 0.3s;
 }
-.export-util-fill.warn { background: var(--warning); }
-.export-util-fill.low  { background: var(--danger); }
-.export-util-pct { font-size: 12px; font-weight: 500; color: var(--text-dim); white-space: nowrap; }
+.export-util-fill.warn {
+  background: var(--warning);
+}
+.export-util-fill.low {
+  background: var(--danger);
+}
+.export-util-pct {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
 
 .export-folder-row {
   display: flex;
@@ -1760,14 +2022,20 @@ body.platform-linux .linux-menubar {
   text-overflow: ellipsis;
   max-width: 240px;
 }
-.btn-sm { padding: 5px 12px; font-size: 12px; white-space: nowrap; }
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
 
 .btn-success {
   background: var(--success) !important;
   color: #0a1a10 !important;
   border-color: transparent !important;
 }
-.btn-success:hover { background: #3db87a !important; }
+.btn-success:hover {
+  background: #3db87a !important;
+}
 
 .export-folder-success {
   color: var(--success) !important;
@@ -1777,4 +2045,8 @@ body.platform-linux .linux-menubar {
   color: var(--danger) !important;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

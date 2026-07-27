@@ -1,3 +1,5 @@
+import type { SparrowPayload, SparrowOptions, ExportPayload } from '../types/electron-api'
+
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 const PRODUCT_NAME = 'Hera Nest'
@@ -20,7 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   parseDXF: (filePath: string, bookmark: string | null = null) =>
     ipcRenderer.invoke('parse-dxf', { filePath, bookmark }),
-  savePlacementJSON: (payload: any) => ipcRenderer.invoke('save-placement-json', payload),
+  savePlacementJSON: (payload: unknown) => ipcRenderer.invoke('save-placement-json', payload),
   openExternalUrl: (url: string) => ipcRenderer.invoke('open-external-url', url),
   appMenuAction: (action: string) => ipcRenderer.invoke('app-menu-action', action),
   getAppMeta: async () => {
@@ -45,18 +47,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
   loadAppSettings: () => ipcRenderer.invoke('load-app-settings'),
-  saveAppSettings: (settings: any) => ipcRenderer.invoke('save-app-settings', settings),
+  saveAppSettings: (settings: unknown) => ipcRenderer.invoke('save-app-settings', settings),
   loadJobState: () => ipcRenderer.invoke('load-job-state'),
-  saveJobState: (jobState: any) => ipcRenderer.invoke('save-job-state', jobState),
-  writeDebugSVG: (payload: any) => ipcRenderer.invoke('write-debug-svg', payload),
-  writeDebugJSON: (payload: any) => ipcRenderer.invoke('write-debug-json', payload),
+  saveJobState: (jobState: unknown) => ipcRenderer.invoke('save-job-state', jobState),
+  writeDebugSVG: (payload: unknown) => ipcRenderer.invoke('write-debug-svg', payload),
+  writeDebugJSON: (payload: unknown) => ipcRenderer.invoke('write-debug-json', payload),
   getNativeEngineInfo: () => ipcRenderer.invoke('get-native-engine-info'),
-  runSparrow: (payload: any, options?: any) => ipcRenderer.invoke('run-sparrow', payload, options),
+  runSparrow: (payload: SparrowPayload, options?: SparrowOptions) =>
+    ipcRenderer.invoke('run-sparrow', payload, options),
   pollSparrow: (runId: string) => ipcRenderer.invoke('poll-sparrow', runId),
   stopSparrow: () => ipcRenderer.invoke('stop-sparrow'),
   chooseExportFolder: () => ipcRenderer.invoke('choose-export-folder'),
-  exportSheetsDXF: (payload: any) => ipcRenderer.invoke('export-sheets-dxf', payload),
-  toPlanarGraph: (nodes: any[], edges: any[], gapTolerance?: number) => {
+  exportSheetsDXF: (payload: ExportPayload) => ipcRenderer.invoke('export-sheets-dxf', payload),
+  toPlanarGraph: (nodes: unknown[], edges: unknown[], gapTolerance?: number) => {
     const response = ipcRenderer.sendSync('to-planar-graph-sync', {
       nodes,
       edges,
@@ -65,7 +68,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     if (response?.success) return response.data
     throw new Error(response?.error || 'to-planar-graph failed')
   },
-  discoverPlanarFaces: (nodes: any[], edges: any[]) => {
+  discoverPlanarFaces: (nodes: unknown[], edges: unknown[]) => {
     const response = ipcRenderer.sendSync('discover-planar-faces-sync', {
       nodes,
       edges

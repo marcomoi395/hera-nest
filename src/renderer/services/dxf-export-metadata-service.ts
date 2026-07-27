@@ -6,6 +6,7 @@ export interface Point3D {
   z: number
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function serializePoint(point: any): Point3D | null {
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null
   return {
@@ -16,14 +17,16 @@ export function serializePoint(point: any): Point3D | null {
 }
 
 export function serializeEntityForExport(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ent: any,
-  contourEntityToPoints: (ent: any) => any[]
-): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contourEntityToPoints: (ent: any) => unknown[]
+): Record<string, unknown> | null {
   if (!ent || !ent.type) return null
 
   const isClosedPolyline = !!(ent.closed || ent.shape || ent.is3dPolygonMeshClosed)
 
-  const out: any = {
+  const out: Record<string, unknown> = {
     type: ent.type,
     layer: ent.layer || '0',
     closed: isClosedPolyline
@@ -92,11 +95,13 @@ export function serializeEntityForExport(
 
   if (
     (ent.type === 'LWPOLYLINE' || ent.type === 'POLYLINE') &&
-    (!out.vertices || !out.vertices.length)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (!out.vertices || !(out.vertices as any).length)
   ) {
     const points = contourEntityToPoints(ent)
     if (Array.isArray(points) && points.length) {
-      out.vertices = points.map((point) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      out.vertices = points.map((point: any) => ({
         x: +point.x,
         y: +point.y,
         z: Number.isFinite(point.z) ? +point.z : 0

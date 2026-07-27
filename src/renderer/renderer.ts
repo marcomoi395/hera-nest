@@ -1,22 +1,36 @@
 import { state, schedulePersistJobState, hydrateJobState } from './state/store'
 import { DEFAULT_ENGRAVING_COLOR } from '../shared/constants'
 import * as NestHelpers from './helpers'
-import { createDxfService } from './services/dxf-service'
-import { createCanvasView } from './views/canvas-view'
-import { createSheetsPane } from './views/sheets-pane'
-import { createSheetModal } from './views/sheet-modal'
-import { createExportService } from './services/export-service'
-import { createNestingService } from './services/nesting-service'
-import { createFilesPane } from './views/files-pane'
-import { createDxfPreviewModal } from './views/dxf-preview-modal'
-import { createSettingsModal } from './views/settings-modal'
+import { createDxfService, type DxfServiceApi } from './services/dxf-service'
+import { createCanvasView, type CanvasViewApi } from './views/canvas-view'
+import { createSheetsPane, type SheetsPaneAPI } from './views/sheets-pane'
+import { createSheetModal, type SheetModalApi, type SheetModalDeps } from './views/sheet-modal'
+import {
+  createExportService,
+  type ExportServiceApi,
+  type ExportServiceDeps
+} from './services/export-service'
+import {
+  createNestingService,
+  type NestingServiceApi,
+  type NestingServiceDeps
+} from './services/nesting-service'
+import { createFilesPane, type FilesPaneApi, type FilesPaneDeps } from './views/files-pane'
+import { createDxfPreviewModal, type DxfPreviewModalApi } from './views/dxf-preview-modal'
+import {
+  createSettingsModal,
+  type SettingsModalApi,
+  type SettingsModalDeps
+} from './views/settings-modal'
 import { createModalCustomSelects } from './views/custom-selects'
 import { createLinuxAppMenu } from './views/linux-app-menu'
 import { parseDXFToShapes } from './services/dxf-preview-service'
+import type { SettingsObject } from '../types/settings'
+import type { DxfFile, DxfLayer } from '../types/dxf-types'
 
 // ─── Platform detection ───────────────────────────────────────────────────────
 const platformString = String(
-  (navigator as any).userAgentData?.platform ||
+  (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ||
     navigator.platform ||
     navigator.userAgent ||
     ''
@@ -185,18 +199,18 @@ function bindFeedbackBanner(): void {
 }
 
 // ─── Service APIs ─────────────────────────────────────────────────────────────
-function currentNestingSettings(): any {
+function currentNestingSettings(): SettingsObject {
   return settingsModalApi.currentNestingSettings()
 }
 
-function engravingLayerIndex(settings: any = currentNestingSettings()): number | null {
+function engravingLayerIndex(settings: SettingsObject = currentNestingSettings()): number | null {
   const raw = settings?.engravingLayer
-  if (raw === 'off' || raw === false || raw == null || raw === '') return null
+  if (raw === 'off' || raw === 'false' || raw == null || raw === '') return null
   const parsed = Number.parseInt(String(raw), 10)
   return Number.isFinite(parsed) && parsed >= 1 ? parsed : 2
 }
 
-function batchLayerAtIndex(index: number): any {
+function batchLayerAtIndex(index: number): DxfLayer | null {
   if (!Number.isFinite(index) || index < 1) return null
   for (const file of state.files || []) {
     const layer = Array.isArray(file?.layers) ? file.layers[index - 1] : null
@@ -205,10 +219,11 @@ function batchLayerAtIndex(index: number): any {
   return null
 }
 
-function resolveEngravingColor(layers: any[] = []): string {
+function resolveEngravingColor(layers: DxfLayer[] = []): string {
   const idx = engravingLayerIndex()
   if (idx !== null && layers[idx - 1]?.color) return layers[idx - 1].color
-  if (idx !== null && batchLayerAtIndex(idx)?.color) return batchLayerAtIndex(idx).color
+  const batchLayer = idx !== null ? batchLayerAtIndex(idx) : null
+  if (batchLayer?.color) return batchLayer.color
   if (idx !== null) {
     const FALLBACK_PALETTE: string[] = []
     if (FALLBACK_PALETTE.length) return FALLBACK_PALETTE[(idx - 1) % FALLBACK_PALETTE.length]
@@ -217,7 +232,7 @@ function resolveEngravingColor(layers: any[] = []): string {
   return DEFAULT_ENGRAVING_COLOR
 }
 
-function engravingStyle(settings: any = currentNestingSettings()): string {
+function engravingStyle(settings: SettingsObject = currentNestingSettings()): string {
   const raw = settings?.engravingStyle
   if (
     raw === 'simple' ||
@@ -233,89 +248,16 @@ function engravingStyle(settings: any = currentNestingSettings()): string {
   return 'stroked'
 }
 
-const dxfServiceApi = createDxfService({
-  state,
-  getCurrentNestingSettings: currentNestingSettings
-})
-
-const canvasViewApi = createCanvasView({
-  state,
-  dom,
-  getCurrentNestingSettings: currentNestingSettings,
-  setNestStatsTone,
-  syncViewportEmptyState
-})
-
-let sheetModalApi: any = null
-const sheetsPaneApi = createSheetsPane({
-  state,
-  dom,
-  schedulePersistJobState,
-  getOpenSheetEditor: () => sheetModalApi?.openSheetEditor,
-  renderTabs: canvasViewApi.renderTabs
-})
-
-sheetModalApi = createSheetModal({
-  state,
-  dom,
-  schedulePersistJobState,
-  renderSheets: sheetsPaneApi.renderSheets
-})
-
-const exportServiceApi = createExportService({
-  state,
-  dom,
-  getCurrentNestingSettings: currentNestingSettings
-})
-
-const nestingServiceApi = createNestingService({
-  state,
-  dom,
-  getCurrentNestingSettings: currentNestingSettings,
-  exportPlacementJSON: dxfServiceApi.exportPlacementJSON,
-  setStatus,
-  setNestStatsTone,
-  showNestResult: canvasViewApi.showNestResult,
-  renderTabs: canvasViewApi.renderTabs,
-  syncExportButton: exportServiceApi.syncExportButton
-})
-
-const filesPaneApi = createFilesPane({
-  state,
-  dom,
-  schedulePersistJobState,
-  hydrateFileShapesForList: dxfServiceApi.hydrateFileShapesForList
-})
-
-const dxfPreviewModalApi = createDxfPreviewModal({
-  state
-})
-
-const settingsModalApi = createSettingsModal({
-  state,
-  dom,
-  onSettingsApplied: () => {
-    if (typeof (window as any).refreshDXFPreview === 'function')
-      (window as any).refreshDXFPreview()
-    if (state.nestResult && state.sheets.length) canvasViewApi.showNestResult(0)
-  }
-})
-
-// ─── Global surface ───────────────────────────────────────────────────────
-;(window as any).state = state
-;(window as any).renderFiles = filesPaneApi.renderFiles
-;(window as any).schedulePersistJobState = schedulePersistJobState
-;(window as any).getCurrentNestingSettings = currentNestingSettings
-;(window as any).getPartLabelText = partLabelFromName
-;(window as any).getPartLabelConfig = (layers: any[] = []) => ({
-  enabled: engravingLayerIndex() !== null,
-  color: resolveEngravingColor(layers),
-  style: engravingStyle()
-})
-;(window as any).removeJobFileById = filesPaneApi.removeJobFileById
-;(window as any).openDXFPreview = dxfPreviewModalApi.openDXFPreview
-;(window as any).parseDXFToShapes = parseDXFToShapes
-;(window as any).refreshDXFPreview = dxfPreviewModalApi.refreshDXFPreview
+// Services - initialized in initializeRenderer() to avoid race condition with window.NestResultScoring
+let dxfServiceApi: DxfServiceApi
+let canvasViewApi: CanvasViewApi
+let sheetModalApi: SheetModalApi
+let sheetsPaneApi: SheetsPaneAPI
+let exportServiceApi: ExportServiceApi
+let nestingServiceApi: NestingServiceApi
+let filesPaneApi: FilesPaneApi
+let dxfPreviewModalApi: DxfPreviewModalApi
+let settingsModalApi: SettingsModalApi
 
 // ─── Drag-and-drop helpers ────────────────────────────────────────────────────
 function showDragDebug(message: string, details = ''): void {
@@ -358,7 +300,10 @@ function normalizeDroppedFiles(fileList: File[]): DroppedFile[] {
     .map((f) => ({
       name: f.name,
       size: f.size,
-      path: (f as any).path || (window.electronAPI as any)?.getPathForDroppedFile?.(f) || null
+      path:
+        (f as File & { path?: string }).path ||
+        window.electronAPI?.getPathForDroppedFile?.(f) ||
+        null
     }))
   showDragDebug(
     `normalized ${files.length} DXF file${files.length === 1 ? '' : 's'}`,
@@ -371,11 +316,14 @@ function extractDroppedFileObjects(dt: DataTransfer): File[] {
   const files: File[] = []
   const seen = new Set<string>()
 
-  const pushFile = (file: File | null) => {
+  const pushFile = (file: File | null): void => {
     if (!file) return
     const name = String(file.name || '')
     if (!name) return
-    const path = (file as any).path || (window.electronAPI as any)?.getPathForDroppedFile?.(file) || ''
+    const path =
+      (file as File & { path?: string }).path ||
+      window.electronAPI?.getPathForDroppedFile?.(file) ||
+      ''
     const key = `${path}::${name}::${file.size || 0}`
     if (seen.has(key)) return
     seen.add(key)
@@ -406,7 +354,7 @@ function handleDroppedDataTransfer(dt: DataTransfer): boolean {
   showDragDebug(
     `drop received: ${dt?.files?.length || 0} file${dt?.files?.length === 1 ? '' : 's'}`,
     Array.from(dt?.files || [])
-      .map((f) => `${f.name} :: ${(f as any).path || 'no-path'}`)
+      .map((f) => `${f.name} :: ${(f as File & { path?: string }).path || 'no-path'}`)
       .join('\n')
   )
   const files = normalizeDroppedFiles(extractDroppedFileObjects(dt))
@@ -442,8 +390,8 @@ function bindDragAndDrop(): void {
   })
 
   dom.dropZone.addEventListener('click', async () => {
-    if ((window.electronAPI as any)?.openFileDialog) {
-      const files = await (window.electronAPI as any).openFileDialog()
+    if (window.electronAPI?.openFileDialog) {
+      const files = await window.electronAPI.openFileDialog()
       filesPaneApi.addFiles(files)
     }
   })
@@ -527,6 +475,74 @@ export async function initializeRenderer(): Promise<void> {
     startBtn: dom.startBtn
   })
 
+  // Initialize services here (after main.ts has set up window.NestResultScoring)
+  dxfServiceApi = createDxfService({
+    state,
+    getCurrentNestingSettings: currentNestingSettings
+  })
+
+  canvasViewApi = createCanvasView({
+    state,
+    dom: dom as any,
+    getCurrentNestingSettings: currentNestingSettings,
+    setNestStatsTone,
+    syncViewportEmptyState
+  })
+
+  exportServiceApi = createExportService({
+    state,
+    dom: dom as unknown as ExportServiceDeps['dom'], // Full dom has all required properties
+    getCurrentNestingSettings: currentNestingSettings
+  })
+
+  sheetsPaneApi = createSheetsPane({
+    state,
+    dom,
+    schedulePersistJobState,
+    getOpenSheetEditor: () => sheetModalApi?.openSheetEditor,
+    renderTabs: canvasViewApi.renderTabs
+  })
+
+  sheetModalApi = createSheetModal({
+    state,
+    dom: dom as unknown as SheetModalDeps['dom'], // Full dom has all required properties
+    schedulePersistJobState,
+    renderSheets: sheetsPaneApi.renderSheets
+  })
+
+  nestingServiceApi = createNestingService({
+    state,
+    dom: dom as unknown as NestingServiceDeps['dom'], // Full dom has all required properties
+    getCurrentNestingSettings: currentNestingSettings,
+    exportPlacementJSON: dxfServiceApi.exportPlacementJSON,
+    setStatus,
+    setNestStatsTone,
+    showNestResult: canvasViewApi.showNestResult,
+    renderTabs: canvasViewApi.renderTabs,
+    syncExportButton: exportServiceApi.syncExportButton
+  })
+
+  filesPaneApi = createFilesPane({
+    state,
+    dom: dom as unknown as FilesPaneDeps['dom'], // Full dom has all required properties
+    schedulePersistJobState,
+    hydrateFileShapesForList: dxfServiceApi.hydrateFileShapesForList
+  })
+
+  dxfPreviewModalApi = createDxfPreviewModal({
+    state
+  })
+
+  settingsModalApi = createSettingsModal({
+    state,
+    dom: dom as unknown as SettingsModalDeps['dom'], // Full dom has all required properties
+    onSettingsApplied: () => {
+      if (typeof (window as { refreshDXFPreview?: () => void }).refreshDXFPreview === 'function')
+        (window as { refreshDXFPreview?: () => void }).refreshDXFPreview?.()
+      if (state.nestResult && state.sheets.length) canvasViewApi.showNestResult()
+    }
+  })
+
   const customSelectsApi = createModalCustomSelects()
   const linuxAppMenuApi = createLinuxAppMenu()
 
@@ -559,7 +575,7 @@ export async function initializeRenderer(): Promise<void> {
   const contourMethod = String(currentSettings?.sketchContourMethod || 'auto')
   const multiSketchDetection = !!currentSettings?.multiSketchDetection
   let backfilledLegacyFileMetadata = false
-  state.files.forEach((file: any) => {
+  state.files.forEach((file: DxfFile) => {
     if (!Array.isArray(file?.shapes) || !file.shapes.length) return
     if (typeof file._multiSketchDetection !== 'boolean') {
       file._multiSketchDetection = multiSketchDetection

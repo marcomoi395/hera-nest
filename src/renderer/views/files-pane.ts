@@ -1,22 +1,65 @@
+import type { DxfFile } from '../../types/dxf-types'
+import type { AppState } from '../state/store'
+
+interface FilesPaneDOMRefs {
+  fileList: HTMLElement
+  clearFilesBtn: HTMLButtonElement | null
+  addFileBtn: HTMLButtonElement
+  dropZone: HTMLElement
+  [key: string]: unknown
+}
+
+export interface FilesPaneDeps {
+  state: AppState
+  dom: FilesPaneDOMRefs
+  schedulePersistJobState: () => void
+  hydrateFileShapesForList: (fileId: string) => {
+    shapes: Array<Record<string, unknown>>
+    layers: Array<Record<string, unknown>>
+  }
+}
+
+interface FilesPaneState {
+  files: DxfFile[]
+}
+
+interface WindowWithPreview extends Window {
+  openDXFPreview?: (fileId: string, fileName: string) => void
+}
+
 import { uid, formatBytes, effectiveFileQty } from '../helpers'
 
+export interface FilesPaneApi {
+  renderFiles: () => void
+  addFiles: (
+    fileObjs: Array<{
+      name: string
+      size?: number
+      path?: string | null
+      bookmark?: string | null
+    }>
+  ) => void
+  removeJobFileById: (fileId: string) => boolean
+  bind: () => void
+}
+
 export function createFilesPane(deps: {
-  state: any
-  dom: any
+  state: FilesPaneState
+  dom: FilesPaneDOMRefs
   schedulePersistJobState: () => void
-  hydrateFileShapesForList: (file: any, cb: () => void) => void
-}) {
+  hydrateFileShapesForList: (file: DxfFile, cb: () => void) => void
+}): FilesPaneApi {
   const { state, dom, schedulePersistJobState, hydrateFileShapesForList } = deps
 
   // Rebuilds the DXF files sidebar so it matches current state.
   // Shows each file's shape count, size, and total qty, wires up the ✕ remove buttons,
   // and disables the Clear button when the list is empty.
-  function renderFiles() {
+  function renderFiles(): void {
     dom.fileList.innerHTML = ''
     if (dom.clearFilesBtn) dom.clearFilesBtn.disabled = state.files.length === 0
-    state.files.forEach((f: any) => {
+    state.files.forEach((f: DxfFile) => {
       const shapeCount = Array.isArray(f.shapes)
-        ? f.shapes.filter((shape: any) => shape.visible !== false).length
+        ? f.shapes!.filter((shape) => shape.visible !== false).length
         : 0
       const shapeLabel = `${shapeCount} shape${shapeCount === 1 ? '' : 's'}`
       const li = document.createElement('li')
@@ -33,19 +76,20 @@ export function createFilesPane(deps: {
             <path d="M9 1L1 9M1 1l8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
           </svg>
         </button>`
-      li.addEventListener('click', e => {
+      li.addEventListener('click', (e) => {
         if (!(e.target as HTMLElement).closest('.file-remove')) {
-          if ((window as any).openDXFPreview) (window as any).openDXFPreview(f.id, f.name)
+          const openDXFPreview = (window as WindowWithPreview).openDXFPreview
+          if (openDXFPreview) openDXFPreview(f.id, f.name)
         }
       })
 
       dom.fileList.appendChild(li)
     })
 
-    dom.fileList.querySelectorAll('.file-remove').forEach((btn: any) => {
+    dom.fileList.querySelectorAll('.file-remove').forEach((btn) => {
       btn.addEventListener('click', (e: Event) => {
         e.stopPropagation()
-        state.files = state.files.filter((x: any) => x.id !== btn.dataset.id)
+        state.files = state.files.filter((x) => x.id !== (btn as HTMLElement).dataset.id)
         renderFiles()
         schedulePersistJobState()
       })
@@ -54,19 +98,24 @@ export function createFilesPane(deps: {
     dom.dropZone.style.display = 'flex'
   }
 
-  // Accepts an array of file objects and adds them to state, skipping duplicates by name.
-  // Kicks off background DXF parsing for each new file so shapes are ready before the user runs nesting.
-  function addFiles(fileObjs: any[]) {
-    const newlyAdded: any[] = []
-    fileObjs.forEach(f => {
-      if (!state.files.find((x: any) => x.name === f.name)) {
+  function addFiles(
+    fileObjs: Array<{
+      name: string
+      size?: number
+      path?: string | null
+      bookmark?: string | null
+    }>
+  ): void {
+    const newlyAdded: DxfFile[] = []
+    fileObjs.forEach((f) => {
+      if (!state.files.find((x) => x.name === f.name)) {
         const file = {
           id: uid(),
           name: f.name,
           size: f.size || 0,
           path: f.path || null,
           bookmark: f.bookmark || null,
-          qty: 1,
+          qty: 1
         }
         state.files.push(file)
         newlyAdded.push(file)
@@ -74,7 +123,7 @@ export function createFilesPane(deps: {
     })
     renderFiles()
     schedulePersistJobState()
-    newlyAdded.forEach(file => {
+    newlyAdded.forEach((file) => {
       void hydrateFileShapesForList(file, () => {
         renderFiles()
         schedulePersistJobState()
@@ -87,7 +136,7 @@ export function createFilesPane(deps: {
   function removeJobFileById(fileId: string): boolean {
     if (!fileId) return false
     const before = state.files.length
-    state.files = state.files.filter((file: any) => file.id !== fileId)
+    state.files = state.files.filter((file) => file.id !== fileId)
     if (state.files.length !== before) {
       renderFiles()
       return true
@@ -97,7 +146,7 @@ export function createFilesPane(deps: {
 
   // Wires the Clear-all button and the Add-file button to their respective actions.
   // In Electron the Add-file button opens the native file picker; in the browser it loads three demo files.
-  function bind() {
+  function bind(): void {
     dom.clearFilesBtn?.addEventListener('click', () => {
       if (!state.files.length) return
       state.files = []
@@ -106,14 +155,14 @@ export function createFilesPane(deps: {
     })
 
     dom.addFileBtn.addEventListener('click', async () => {
-      if ((window as any).electronAPI) {
-        const files = await (window as any).electronAPI.openFileDialog()
+      if ((window as WindowWithPreview).electronAPI) {
+        const files = await (window as WindowWithPreview).electronAPI!.openFileDialog()
         addFiles(files)
       } else {
         addFiles([
           { name: 'bracket_L.dxf', size: 14200 },
           { name: 'panel_A.dxf', size: 28400 },
-          { name: 'gusset_01.dxf', size: 9100 },
+          { name: 'gusset_01.dxf', size: 9100 }
         ])
       }
     })
@@ -123,6 +172,6 @@ export function createFilesPane(deps: {
     renderFiles,
     addFiles,
     removeJobFileById,
-    bind,
+    bind
   }
 }

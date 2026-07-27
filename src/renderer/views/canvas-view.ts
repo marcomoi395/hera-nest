@@ -1,14 +1,38 @@
 import { formatWidthMeters, partLabelFromName } from '../helpers'
 import { DEFAULT_ENGRAVING_COLOR } from '../../shared/constants'
 import { FALLBACK_PALETTE } from '../services/dxf-layer-service'
+import type { AppState } from '../state/store'
+import type { SettingsObject } from '../../types/settings'
+import type { Strip, NestSheet } from '../../types/dxf-types'
+type CanvasViewState = AppState
+interface CanvasViewDOMRefs {
+  canvas?: HTMLCanvasElement
+  tabsContainer?: HTMLElement
+  canvasTabs?: HTMLElement
+  viewport?: HTMLElement
+  svgContainer?: HTMLElement
+  nestStats?: HTMLElement
+  emptyState?: HTMLElement
+  zoomLabel?: HTMLElement
+  zoomIn?: HTMLElement
+  zoomOut?: HTMLElement
+  fitView?: HTMLElement
+}
+
+export interface CanvasViewApi {
+  renderTabs: () => void
+  showNestResult: (sheetIndex?: number) => void
+  applyZoom: (skipSaveZoom?: boolean) => void
+  bind: () => void
+}
 
 export function createCanvasView(deps: {
-  state: any
-  dom: any
-  getCurrentNestingSettings: () => any
+  state: CanvasViewState
+  dom: CanvasViewDOMRefs
+  getCurrentNestingSettings: () => SettingsObject
   setNestStatsTone: (tone: string) => void
   syncViewportEmptyState: (isEmpty: boolean) => void
-}) {
+}): CanvasViewApi {
   const { state, dom, getCurrentNestingSettings, setNestStatsTone, syncViewportEmptyState } = deps
 
   const FIT_INSET_X = 40
@@ -17,14 +41,16 @@ export function createCanvasView(deps: {
   const SVG_PREVIEW_MARGIN_Y = 24
   let lastRenderedSvg = ''
 
-  function engravingLayerIndex(settings: any = getCurrentNestingSettings()): number | null {
+  function engravingLayerIndex(
+    settings: SettingsObject = getCurrentNestingSettings()
+  ): number | null {
     const raw = settings?.engravingLayer
-    if (raw === 'off' || raw === false || raw == null || raw === '') return null
+    if (raw === 'off' || raw == null || raw === '') return null
     const parsed = Number.parseInt(String(raw), 10)
     return Number.isFinite(parsed) && parsed >= 1 ? parsed : 2
   }
 
-  function batchLayerAtIndex(index: number): any {
+  function batchLayerAtIndex(index: number): { name?: string; color?: string } | null {
     if (!Number.isFinite(index) || index < 1) return null
     for (const file of state.files || []) {
       const layer = Array.isArray(file?.layers) ? file.layers[index - 1] : null
@@ -33,20 +59,21 @@ export function createCanvasView(deps: {
     return null
   }
 
-  function resolveEngravingColor(layers: any[] = []): string {
+  function resolveEngravingColor(layers: Array<{ color?: string }> = []): string {
     const idx = engravingLayerIndex()
-    if (idx !== null && layers[idx - 1]?.color) return layers[idx - 1].color
-    if (idx !== null && batchLayerAtIndex(idx)?.color) return batchLayerAtIndex(idx).color
-    if (idx !== null && FALLBACK_PALETTE.length) return FALLBACK_PALETTE[(idx - 1) % FALLBACK_PALETTE.length]
+    if (idx !== null && layers[idx - 1]?.color) return layers[idx - 1].color!
+    if (idx !== null && batchLayerAtIndex(idx)?.color) return batchLayerAtIndex(idx)?.color!
+    if (idx !== null && FALLBACK_PALETTE.length)
+      return FALLBACK_PALETTE[(idx - 1) % FALLBACK_PALETTE.length]
     if (layers[0]?.color) return layers[0].color
     return DEFAULT_ENGRAVING_COLOR
   }
 
-  function currentSheetConfig(): any {
-    return state.sheets[0] || {}
+  function currentSheetConfig(): NestSheet {
+    return (state.sheets[0] || {}) as NestSheet
   }
 
-  function displayStripWidth(strip: any, sheet: any = currentSheetConfig()): number {
+  function displayStripWidth(strip: Strip, sheet: NestSheet = currentSheetConfig()): number {
     if (sheet?.widthMode === 'fixed') {
       const configuredWidth = Number(sheet?.width)
       if (Number.isFinite(configuredWidth) && configuredWidth > 0) return configuredWidth
@@ -54,7 +81,10 @@ export function createCanvasView(deps: {
     return Number(strip?.strip_width) || 0
   }
 
-  function displayStripDensity(strip: any, sheet: any = currentSheetConfig()): number | null {
+  function displayStripDensity(
+    strip: Strip,
+    sheet: NestSheet = currentSheetConfig()
+  ): number | null {
     if (!strip) return null
     const rawDensity = Number(strip?.density)
     if (!Number.isFinite(rawDensity)) return null
@@ -63,7 +93,12 @@ export function createCanvasView(deps: {
     const rawHeight = Number(strip?.strip_height) || Number(sheet?.height)
     const targetWidth = displayStripWidth(strip, sheet)
 
-    if (!Number.isFinite(rawWidth) || rawWidth <= 0 || !Number.isFinite(rawHeight) || rawHeight <= 0) {
+    if (
+      !Number.isFinite(rawWidth) ||
+      rawWidth <= 0 ||
+      !Number.isFinite(rawHeight) ||
+      rawHeight <= 0
+    ) {
       return rawDensity
     }
     if (sheet?.widthMode !== 'fixed') return rawDensity
@@ -74,8 +109,20 @@ export function createCanvasView(deps: {
     return usedArea / fixedArea
   }
 
-  function parseRectPathData(pathData: string): { x0: number; y0: number; x1: number; y1: number; x2: number; y2: number; x3: number; y3: number } | null {
-    const match = /^M([-\d.]+),([-\d.]+) L([-\d.]+),([-\d.]+) L([-\d.]+),([-\d.]+) L([-\d.]+),([-\d.]+) z$/i.exec((pathData || '').trim())
+  function parseRectPathData(pathData: string): {
+    x0: number
+    y0: number
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+    x3: number
+    y3: number
+  } | null {
+    const match =
+      /^M([-\d.]+),([-\d.]+) L([-\d.]+),([-\d.]+) L([-\d.]+),([-\d.]+) L([-\d.]+),([-\d.]+) z$/i.exec(
+        (pathData || '').trim()
+      )
     if (!match) return null
     return {
       x0: Number(match[1]),
@@ -85,7 +132,7 @@ export function createCanvasView(deps: {
       x2: Number(match[5]),
       y2: Number(match[6]),
       x3: Number(match[7]),
-      y3: Number(match[8]),
+      y3: Number(match[8])
     }
   }
 
@@ -93,7 +140,7 @@ export function createCanvasView(deps: {
     return `M${x},${y} L${x + width},${y} L${x + width},${y + height} L${x},${y + height} z`
   }
 
-  function adjustSvgForFixedWidth(svg: string, strip: any, targetWidth: number): string {
+  function adjustSvgForFixedWidth(svg: string, strip: Strip, targetWidth: number): string {
     if (!svg || !Number.isFinite(targetWidth) || targetWidth <= 0) return svg
 
     const parser = new DOMParser()
@@ -106,14 +153,14 @@ export function createCanvasView(deps: {
       x: viewBoxParts[0] || 0,
       y: viewBoxParts[1] || 0,
       w: viewBoxParts[2] || 0,
-      h: viewBoxParts[3] || 0,
+      h: viewBoxParts[3] || 0
     }
     if (!Number.isFinite(vb.w) || vb.w <= 0) return svg
 
     const previewMinX = -SVG_PREVIEW_MARGIN_X
     const previewMinY = vb.y - SVG_PREVIEW_MARGIN_Y
-    const previewWidth = targetWidth + (SVG_PREVIEW_MARGIN_X * 2)
-    const previewHeight = vb.h + (SVG_PREVIEW_MARGIN_Y * 2)
+    const previewWidth = targetWidth + SVG_PREVIEW_MARGIN_X * 2
+    const previewHeight = vb.h + SVG_PREVIEW_MARGIN_Y * 2
 
     root.setAttribute('viewBox', `${previewMinX} ${previewMinY} ${previewWidth} ${previewHeight}`)
     root.setAttribute('width', `${previewWidth}`)
@@ -122,7 +169,7 @@ export function createCanvasView(deps: {
     const frameOriginX = 0
     const frameGroups = Array.from(root.querySelectorAll('g[id^="container_"]'))
     let normalizedAnyFrame = false
-    frameGroups.forEach(group => {
+    frameGroups.forEach((group) => {
       const framePath = group.querySelector('path')
       if (!framePath) return
       const rect = parseRectPathData(framePath.getAttribute('d') || '')
@@ -149,7 +196,11 @@ export function createCanvasView(deps: {
       if (rect) {
         const width = rect.x1 - rect.x0
         const height = rect.y2 - rect.y1
-        if (Number.isFinite(width) && Number.isFinite(height) && (Math.abs(width - sourceWidth) <= 0.1 || normalizedAnyFrame)) {
+        if (
+          Number.isFinite(width) &&
+          Number.isFinite(height) &&
+          (Math.abs(width - sourceWidth) <= 0.1 || normalizedAnyFrame)
+        ) {
           dashedOutline.setAttribute('d', formatRectPathData(0, rect.y0, targetWidth, height))
         }
       }
@@ -159,7 +210,7 @@ export function createCanvasView(deps: {
     return serializer.serializeToString(root)
   }
 
-  function styleStripSVG(svg: string, strip: any = null): string {
+  function styleStripSVG(svg: string, strip: Strip | null = null): string {
     if (!svg) return ''
 
     let styled = svg
@@ -167,11 +218,16 @@ export function createCanvasView(deps: {
     const sheet = currentSheetConfig()
     const targetWidth = strip ? displayStripWidth(strip, sheet) : null
     if (targetWidth) {
-      styled = adjustSvgForFixedWidth(styled, strip, targetWidth)
+      styled = adjustSvgForFixedWidth(styled, strip!, targetWidth)
     }
     const viewBoxMatch = styled.match(/viewBox="([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)"/i)
     const vb = viewBoxMatch
-      ? { x: Number(viewBoxMatch[1]), y: Number(viewBoxMatch[2]), w: Number(viewBoxMatch[3]), h: Number(viewBoxMatch[4]) }
+      ? {
+          x: Number(viewBoxMatch[1]),
+          y: Number(viewBoxMatch[2]),
+          w: Number(viewBoxMatch[3]),
+          h: Number(viewBoxMatch[4])
+        }
       : { x: 0, y: 0, w: 3000, h: 1250 }
 
     const bgMarkup = `
@@ -186,11 +242,19 @@ export function createCanvasView(deps: {
 </defs>`
 
     styled = styled.replace(/<svg([^>]*)>/i, `<svg$1>\n${bgMarkup}`)
-    styled = styled.replace(/fill="#D3D3D3"\s+stroke="black"\s+stroke-width="([\d.]+)"/gi, (_, sw) => `fill="url(#nestGrid)" stroke="#2e3550" stroke-width="${sw}"`)
-    styled = styled.replace(/fill="#7A7A7A"\s+fill-opacity="0\.5"\s+fill-rule="nonzero"\s+stroke="black"\s+stroke-width="([\d.]+)"/gi, (_, sw) => `fill="#1a2744" fill-opacity="1" fill-rule="nonzero" stroke="#4f8ef7" stroke-width="${(Number(sw) * 0.7).toFixed(4)}" filter="url(#partGlow)"`)
+    styled = styled.replace(
+      /fill="#D3D3D3"\s+stroke="black"\s+stroke-width="([\d.]+)"/gi,
+      (_, sw) => `fill="url(#nestGrid)" stroke="#2e3550" stroke-width="${sw}"`
+    )
+    styled = styled.replace(
+      /fill="#7A7A7A"\s+fill-opacity="0\.5"\s+fill-rule="nonzero"\s+stroke="black"\s+stroke-width="([\d.]+)"/gi,
+      (_, sw) =>
+        `fill="#1a2744" fill-opacity="1" fill-rule="nonzero" stroke="#4f8ef7" stroke-width="${(Number(sw) * 0.7).toFixed(4)}" filter="url(#partGlow)"`
+    )
     styled = styled.replace(
       /fill="none"\s+stroke="black"\s+stroke-dasharray="([^"]+)"\s+stroke-linecap="([^"]+)"\s+stroke-linejoin="([^"]+)"\s+stroke-opacity="0\.3"\s+stroke-width="([\d.]+)"/gi,
-      (_, da, lc, lj, sw) => `fill="none" stroke="#3a5080" stroke-dasharray="${da}" stroke-linecap="${lc}" stroke-linejoin="${lj}" stroke-opacity="0.35" stroke-width="${(Number(sw) * 0.6).toFixed(4)}"`
+      (_, da, lc, lj, sw) =>
+        `fill="none" stroke="#3a5080" stroke-dasharray="${da}" stroke-linecap="${lc}" stroke-linejoin="${lj}" stroke-opacity="0.35" stroke-width="${(Number(sw) * 0.6).toFixed(4)}"`
     )
     styled = styled.replace(/stroke="black"/gi, 'stroke="#2e3550"')
     styled = styled.replace(/<text[^>]*>[\s\S]*?h:[\s\S]*?<\/text>/gi, '')
@@ -199,7 +263,7 @@ export function createCanvasView(deps: {
 
   function renderTabs(): void {
     if (!state.nestResult?.strips?.length) {
-      dom.canvasTabs.innerHTML = ''
+      ;(dom.canvasTabs as HTMLElement).innerHTML = ''
       return
     }
 
@@ -207,21 +271,24 @@ export function createCanvasView(deps: {
     const activeIndex = Math.min(state.activeStripIndex || 0, Math.max(0, stripCount - 1))
     state.activeStripIndex = activeIndex
 
-    const existing = Array.from(dom.canvasTabs.querySelectorAll('.canvas-tab')) as HTMLButtonElement[]
+    const existing = Array.from(
+      (dom.canvasTabs as HTMLElement).querySelectorAll('.canvas-tab')
+    ) as HTMLButtonElement[]
     const initialCount = existing.length
 
     for (let i = initialCount; i < stripCount; i++) {
-      const btn = document.createElement('button')
+      const btn: HTMLButtonElement = document.createElement('button')
       btn.className = 'canvas-tab'
       btn.textContent = `Sheet ${i + 1}`
       btn.addEventListener('click', () => {
-        dom.canvasTabs.querySelectorAll('.canvas-tab').forEach((b: Element) => b.classList.remove('active'))
+        const tabs = dom.canvasTabs as HTMLElement
+        tabs.querySelectorAll('.canvas-tab').forEach((b: Element) => b.classList.remove('active'))
         btn.classList.add('active')
         state.activeStripIndex = i
         btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
         showNestResult(i)
       })
-      dom.canvasTabs.appendChild(btn)
+      ;(dom.canvasTabs as HTMLElement).appendChild(btn)
       existing.push(btn)
     }
     while (existing.length > stripCount) {
@@ -236,7 +303,11 @@ export function createCanvasView(deps: {
     const countGrew = stripCount > initialCount
     if (countGrew) {
       requestAnimationFrame(() => {
-        existing[activeIndex]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+        existing[activeIndex]?.scrollIntoView({
+          behavior: 'smooth',
+          inline: 'center',
+          block: 'nearest'
+        })
       })
     }
   }
@@ -245,31 +316,56 @@ export function createCanvasView(deps: {
     const sheet = state.sheets[sheetIndex]
     if (!sheet) return null
 
-    const previewWidth = sheet.widthMode === 'unlimited' ? 3000 : (sheet.width || 3000)
+    const previewWidth = sheet.widthMode === 'unlimited' ? 3000 : sheet.width || 3000
     const W = 800
-    const H = Math.round(800 * sheet.height / previewWidth)
+    const H = Math.round((800 * (sheet.height ?? 3000)) / previewWidth)
     const colors = ['#4f8ef7', '#4fcf8e', '#f7c34f', '#f77f4f', '#cf4ff7', '#4ff7e8']
-    const shapes: any[] = []
-    const placed: any[] = []
+    const shapes: Array<{
+      w: number
+      h: number
+      x?: number
+      y?: number
+      type: string
+      name: string
+      color: string
+      id: number
+    }> = []
+    const placed: Array<{ x: number; y: number; w: number; h: number }> = []
 
-    const tryPlace = (shape: any, attempts = 60) => {
+    const tryPlace = (
+      shape: { w: number; h: number; x?: number; y?: number },
+      attempts = 60
+    ): boolean => {
       for (let i = 0; i < attempts; i++) {
         const x = 20 + Math.random() * (W - shape.w - 40)
         const y = 20 + Math.random() * (H - shape.h - 40)
-        const overlaps = placed.some(p =>
-          x < p.x + p.w + 4 && x + shape.w + 4 > p.x &&
-          y < p.y + p.h + 4 && y + shape.h + 4 > p.y
+        const overlaps = placed.some(
+          (p) =>
+            x < p.x + p.w + 4 && x + shape.w + 4 > p.x && y < p.y + p.h + 4 && y + shape.h + 4 > p.y
         )
-        if (!overlaps) { shape.x = x; shape.y = y; return true }
+        if (!overlaps) {
+          shape.x = x
+          shape.y = y
+          return true
+        }
       }
       return false
     }
 
-    state.files.forEach((f: any, fi: number) => {
-      for (let q = 0; q < Math.min(f.qty, 8); q++) {
+    state.files.forEach((f, fi: number) => {
+      for (let q = 0; q < Math.min(f.qty ?? 0, 8); q++) {
         const type = (fi + q) % 4
         const scale = 0.7 + Math.random() * 0.6
-        let shape: any
+        let shape: {
+          w: number
+          h: number
+          type: string
+          name: string
+          color?: string
+          id?: number
+          x?: number
+          y?: number
+        }
         if (type === 0) shape = { w: 80 * scale, h: 50 * scale, type: 'rect', name: f.name }
         else if (type === 1) shape = { w: 90 * scale, h: 70 * scale, type: 'L', name: f.name }
         else if (type === 2) shape = { w: 100 * scale, h: 60 * scale, type: 'notch', name: f.name }
@@ -277,7 +373,21 @@ export function createCanvasView(deps: {
 
         shape.color = colors[fi % colors.length]
         shape.id = fi
-        if (tryPlace(shape, 80)) { placed.push(shape); shapes.push(shape) }
+        if (tryPlace(shape, 80)) {
+          placed.push(shape as { x: number; y: number; w: number; h: number })
+          shapes.push(
+            shape as {
+              w: number
+              h: number
+              x?: number
+              y?: number
+              type: string
+              name: string
+              color: string
+              id: number
+            }
+          )
+        }
       }
     })
 
@@ -292,36 +402,46 @@ export function createCanvasView(deps: {
         </filter>
       </defs>`
 
-    const shapesSVG = shapes.map(s => {
-      const { x, y, w, h, type } = s
-      const fill = '#1a2744'
-      const stroke = '#4f8ef7'
-      const strokeOpacity = '0.75'
-      let path = ''
+    const shapesSVG = shapes
+      .filter((s) => s.x != null && s.y != null && s.w != null && s.h != null)
+      .map((s) => {
+        const { x, y, w, h, type } = s
+        // After filter, these are guaranteed to exist
+        const _x = x!,
+          _y = y!,
+          _w = w!,
+          _h = h!
+        const fill = '#1a2744'
+        const stroke = '#4f8ef7'
+        const strokeOpacity = '0.75'
+        let path = ''
 
-      if (type === 'rect') {
-        path = `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
-      } else if (type === 'L') {
-        const hw = (w * 0.45).toFixed(1), hh = (h * 0.45).toFixed(1)
-        path = `<path d="M${x.toFixed(1)},${y.toFixed(1)} h${w.toFixed(1)} v${hh} h${-hw} v${(h - parseFloat(hh)).toFixed(1)} h${-(w - parseFloat(hw)).toFixed(1)} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
-      } else if (type === 'notch') {
-        const nw = (w * 0.25).toFixed(1), nh = (h * 0.35).toFixed(1)
-        const nx = (x + w / 2 - parseFloat(nw) / 2).toFixed(1)
-        path = `<path d="M${x.toFixed(1)},${y.toFixed(1)} h${w.toFixed(1)} v${h.toFixed(1)} h${-w.toFixed(1)} Z M${nx},${y.toFixed(1)} h${nw} v${nh} h${-nw} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" fill-rule="evenodd" filter="url(#partGlow)"/>`
-      } else {
-        const tw = (w * 0.4).toFixed(1)
-        const stemH = (h * 0.55).toFixed(1)
-        path = `<path d="M${x.toFixed(1)},${y.toFixed(1)} h${w.toFixed(1)} v${(h - parseFloat(stemH)).toFixed(1)} h${-(w / 2 - parseFloat(tw) / 2).toFixed(1)} v${stemH} h${-parseFloat(tw).toFixed(1)} v${-stemH} h${-(w / 2 - parseFloat(tw) / 2).toFixed(1)} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
-      }
+        if (type === 'rect') {
+          path = `<rect x="${_x.toFixed(1)}" y="${_y.toFixed(1)}" width="${_w.toFixed(1)}" height="${_h.toFixed(1)}" rx="2" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
+        } else if (type === 'L') {
+          const hw = (_w * 0.45).toFixed(1),
+            hh = (_h * 0.45).toFixed(1)
+          path = `<path d="M${_x.toFixed(1)},${_y.toFixed(1)} h${_w.toFixed(1)} v${hh} h${-hw} v${(_h - parseFloat(hh)).toFixed(1)} h${-(_w - parseFloat(hw)).toFixed(1)} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
+        } else if (type === 'notch') {
+          const nw = (_w * 0.25).toFixed(1),
+            nh = (_h * 0.35).toFixed(1)
+          const nx = (_x + _w / 2 - parseFloat(nw) / 2).toFixed(1)
+          path = `<path d="M${_x.toFixed(1)},${_y.toFixed(1)} h${_w.toFixed(1)} v${_h.toFixed(1)} h${-_w.toFixed(1)} Z M${nx},${_y.toFixed(1)} h${nw} v${nh} h${-nw} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" fill-rule="evenodd" filter="url(#partGlow)"/>`
+        } else {
+          const tw = (_w * 0.4).toFixed(1)
+          const stemH = (_h * 0.55).toFixed(1)
+          path = `<path d="M${_x.toFixed(1)},${_y.toFixed(1)} h${_w.toFixed(1)} v${(_h - parseFloat(stemH)).toFixed(1)} h${-(_w / 2 - parseFloat(tw) / 2).toFixed(1)} v${stemH} h${-parseFloat(tw).toFixed(1)} v${-stemH} h${-(_w / 2 - parseFloat(tw) / 2).toFixed(1)} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
+        }
 
-      const labelText = engravingLayerIndex() !== null ? partLabelFromName(s.name) : ''
-      const labelFontSize = Math.max(7, Math.min(w, h) * 0.12)
-      const labelStrokeWidth = 0.8
-      const label = labelText
-        ? `<text x="${(x + w / 2).toFixed(1)}" y="${(y + h / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="${labelFontSize.toFixed(1)}" fill="none" stroke="${resolveEngravingColor()}" stroke-width="${labelStrokeWidth.toFixed(2)}" stroke-linejoin="round" stroke-linecap="round" opacity="0.96" font-family="monospace">${labelText}</text>`
-        : ''
-      return path + label
-    }).join('\n')
+        const labelText = engravingLayerIndex() !== null ? partLabelFromName(s.name) : ''
+        const labelFontSize = Math.max(7, Math.min(_w, _h) * 0.12)
+        const labelStrokeWidth = 0.8
+        const label = labelText
+          ? `<text x="${(_x + _w / 2).toFixed(1)}" y="${(_y + _h / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="${labelFontSize.toFixed(1)}" fill="none" stroke="${resolveEngravingColor()}" stroke-width="${labelStrokeWidth.toFixed(2)}" stroke-linejoin="round" stroke-linecap="round" opacity="0.96" font-family="monospace">${labelText}</text>`
+          : ''
+        return path + label
+      })
+      .join('\n')
 
     const utilization = Math.round(60 + Math.random() * 25)
     return {
@@ -334,59 +454,60 @@ export function createCanvasView(deps: {
           ${sheet.width} × ${sheet.height} mm · Preview · ${utilization}% utilization
         </text>
       </svg>`,
-      utilization,
+      utilization
     }
   }
 
-  function showNestResult(sheetIndex: number): void {
-    const strip = state.nestResult?.strips?.[sheetIndex] || null
+  function showNestResult(sheetIndex?: number): void {
+    const actualIndex = sheetIndex ?? state.activeStripIndex ?? 0
+    const strip = state.nestResult?.strips?.[actualIndex] || null
     if (strip?.svg) {
       const sheet = currentSheetConfig()
-      state.activeStripIndex = sheetIndex
+      state.activeStripIndex = actualIndex
       const styled = styleStripSVG(strip.svg, strip)
-      const previousIndex = dom.svgContainer.dataset.activeIndex
-      const sameStrip = previousIndex === String(sheetIndex)
+      const previousIndex = dom.svgContainer?.dataset.activeIndex
+      const sameStrip = previousIndex === String(actualIndex)
       const sameSvg = sameStrip && lastRenderedSvg === styled
-      if (!sameSvg) {
+      if (!sameSvg && dom.svgContainer) {
         dom.svgContainer.innerHTML = styled
-        dom.svgContainer.dataset.activeIndex = String(sheetIndex)
         lastRenderedSvg = styled
       }
-      dom.svgContainer.style.display = 'grid'
-      dom.emptyState.style.display = 'none'
+      if (dom.svgContainer) dom.svgContainer.style.display = 'grid'
+      if (dom.emptyState) dom.emptyState.style.display = 'none'
       syncViewportEmptyState(false)
       const placed = Number(strip.item_count) || 0
       const densityValue = displayStripDensity(strip, sheet)
       const density = Number.isFinite(densityValue) ? `${(densityValue! * 100).toFixed(1)}%` : null
       const usedWidth = formatWidthMeters(displayStripWidth(strip, sheet))
-      const previewPrefix = strip.is_preview || state.nestResult.is_preview ? 'Preview · ' : ''
+      const previewPrefix = strip.is_preview || state.nestResult?.is_preview ? 'Preview · ' : ''
       setNestStatsTone('')
       const partsText = placed > 0 ? ` · ${placed} parts` : ''
       const utilText = density ? ` · Utilization: ${density}` : ''
-      dom.nestStats.textContent = `${previewPrefix}Sheet ${sheetIndex + 1} of ${state.nestResult.strips.length}${partsText}${utilText} · Width: ${usedWidth}`
-      if (!sameSvg) applyZoom(true)
+      if (dom.nestStats) {
+        dom.nestStats.textContent = `${previewPrefix}Sheet ${actualIndex + 1} of ${state.nestResult?.strips?.length ?? 0}${partsText}${utilText} · Width: ${usedWidth}`
+      }
       return
     }
 
     if (strip) {
-      state.activeStripIndex = sheetIndex
+      state.activeStripIndex = actualIndex
       const totalSheets = state.nestResult?.strips?.length || state.nestResult?.strip_count || 0
       const waitingPrefix = strip.is_preview || state.nestResult?.is_preview ? 'Preview · ' : ''
       setNestStatsTone('')
-      dom.nestStats.textContent = `${waitingPrefix}Sheet ${sheetIndex + 1} of ${totalSheets} · Waiting for geometry`
-      return
+      if (dom.nestStats) {
+        dom.nestStats.textContent = `${waitingPrefix}Sheet ${actualIndex + 1} of ${totalSheets} · Waiting`
+      }
+      if (dom.svgContainer) dom.svgContainer.style.display = 'none'
+      if (dom.svgContainer) dom.svgContainer.innerHTML = ''
+      if (dom.emptyState) dom.emptyState.style.display = 'grid'
+      syncViewportEmptyState(true)
+      const placedTotal = (state.files || []).reduce((sum, f) => sum + (f.qty ?? 0), 0)
+      const emptyMessage =
+        placedTotal > 0 ? `Waiting for nesting result...` : `Import DXF files to start`
+      if (dom.nestStats) {
+        dom.nestStats.textContent = emptyMessage
+      }
     }
-
-    const result = generateMockNestSVG(sheetIndex)
-    if (!result) return
-    dom.svgContainer.innerHTML = result.svg
-    dom.svgContainer.style.display = 'grid'
-    dom.emptyState.style.display = 'none'
-    syncViewportEmptyState(false)
-    const placed = state.files.reduce((a: number, f: any) => a + f.qty, 0)
-    const mockWidth = formatWidthMeters(state.sheets[sheetIndex]?.width)
-    setNestStatsTone('')
-    dom.nestStats.textContent = `Sheet ${sheetIndex + 1} of ${state.sheets.length} · ${placed} parts placed · Utilization: ${result.utilization}% · Width: ${mockWidth}`
     applyZoom(true)
   }
 
@@ -399,13 +520,23 @@ export function createCanvasView(deps: {
   }
 
   function applyZoom(recenter = false): void {
-    const el = dom.svgContainer.querySelector('svg') as SVGSVGElement | null
+    const el = dom.svgContainer?.querySelector('svg') as SVGSVGElement | null
     if (el) {
       const viewBox = (el.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number)
-      const baseWidth = Number(el.dataset.baseWidth) || viewBox[2] || el.viewBox?.baseVal?.width || el.clientWidth || 1
-      const baseHeight = Number(el.dataset.baseHeight) || viewBox[3] || el.viewBox?.baseVal?.height || el.clientHeight || 1
-      const fitWidth = Math.max(1, (dom.viewport?.clientWidth || baseWidth) - (FIT_INSET_X * 2))
-      const fitHeight = Math.max(1, (dom.viewport?.clientHeight || baseHeight) - (FIT_INSET_Y * 2))
+      const baseWidth =
+        Number(el.dataset.baseWidth) ||
+        viewBox[2] ||
+        el.viewBox?.baseVal?.width ||
+        el.clientWidth ||
+        1
+      const baseHeight =
+        Number(el.dataset.baseHeight) ||
+        viewBox[3] ||
+        el.viewBox?.baseVal?.height ||
+        el.clientHeight ||
+        1
+      const fitWidth = Math.max(1, (dom.viewport?.clientWidth || baseWidth) - FIT_INSET_X * 2)
+      const fitHeight = Math.max(1, (dom.viewport?.clientHeight || baseHeight) - FIT_INSET_Y * 2)
       const fitScale = Math.min(fitWidth / baseWidth, fitHeight / baseHeight, 1)
       el.dataset.baseWidth = String(baseWidth)
       el.dataset.baseHeight = String(baseHeight)
@@ -420,24 +551,33 @@ export function createCanvasView(deps: {
   }
 
   function bind(): void {
-    dom.zoomIn?.addEventListener('click', () => { state.zoom = Math.min(4, state.zoom + 0.15); applyZoom() })
-    dom.zoomOut?.addEventListener('click', () => { state.zoom = Math.max(0.2, state.zoom - 0.15); applyZoom() })
-    dom.fitView?.addEventListener('click', () => { state.zoom = 1; applyZoom(true) })
+    dom.zoomIn?.addEventListener('click', () => {
+      state.zoom = Math.min(4, state.zoom + 0.15)
+      applyZoom()
+    })
+    dom.zoomOut?.addEventListener('click', () => {
+      state.zoom = Math.max(0.2, state.zoom - 0.15)
+      applyZoom()
+    })
+    dom.fitView?.addEventListener('click', () => {
+      state.zoom = 1
+      applyZoom(true)
+    })
 
     let viewportDrag: any = null
     let rafId: number | null = null
     dom.viewport?.addEventListener('mousedown', (e: MouseEvent) => {
-      if (e.button !== 0) return
+      if (e.button !== 0 || !dom.viewport) return
       viewportDrag = {
         startX: e.clientX,
         startY: e.clientY,
         scrollLeft: dom.viewport.scrollLeft,
-        scrollTop: dom.viewport.scrollTop,
+        scrollTop: dom.viewport.scrollTop
       }
       dom.viewport.classList.add('dragging')
     })
 
-    window.addEventListener('mousemove', e => {
+    window.addEventListener('mousemove', (e) => {
       if (!viewportDrag || !dom.viewport) return
       if (rafId) cancelAnimationFrame(rafId)
       rafId = requestAnimationFrame(() => {
@@ -463,6 +603,6 @@ export function createCanvasView(deps: {
     renderTabs,
     showNestResult,
     applyZoom,
-    bind,
+    bind
   }
 }

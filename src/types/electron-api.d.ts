@@ -50,6 +50,7 @@ export interface NativeEngineInfo {
   arch: string
   sparrowPath: string
   sparrowExists: boolean
+  packaged: boolean
 }
 
 export interface SparrowPayload {
@@ -67,6 +68,7 @@ export interface SparrowOptions {
 export interface SparrowResult {
   success: boolean
   runId: string
+  inputPath?: string
   error?: string
 }
 
@@ -106,9 +108,11 @@ export interface ExportResult {
 }
 
 export interface ElectronAPI {
-  parseDXF: (data: unknown, raw: unknown) => Promise<ParseResult>
   openFileDialog: () => Promise<FileDialogResult[]>
+  getPathForDroppedFile: (file: File) => string
+  parseDXF: (filePath: string, bookmark?: string | null) => Promise<ParseResult>
   savePlacementJSON: (payload: unknown) => Promise<SaveResult>
+  openExternalUrl: (url: string) => Promise<void>
   appMenuAction: (action: string) => Promise<void>
   getAppMeta: () => Promise<AppMetaResult>
   loadAppSettings: () => Promise<LoadSettingsResult>
@@ -125,5 +129,4 @@ export interface ElectronAPI {
   exportSheetsDXF: (payload: ExportPayload) => Promise<ExportResult>
   toPlanarGraph: (nodes: unknown[], edges: unknown[], gapTolerance?: number) => unknown
   discoverPlanarFaces: (nodes: unknown[], edges: unknown[]) => unknown
-  openExternalUrl?: (url: string) => Promise<void>
 }

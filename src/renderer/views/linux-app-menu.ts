@@ -1,4 +1,58 @@
-export function createLinuxAppMenu() {
+interface HelpUrls {
+  supportUrl: string
+  releasesUrl: string
+  websiteUrl: string
+  redditUrl?: string
+  linkedInUrl?: string
+}
+
+interface MenuItemSeparator {
+  type: 'separator'
+}
+
+interface MenuItemIpc {
+  label: string
+  action: string
+  type: 'ipc'
+}
+
+interface MenuItemUrl {
+  label: string
+  action: string
+  type: 'url'
+}
+
+interface MenuItemLocal {
+  label: string
+  action: string
+  type: 'local'
+}
+
+type MenuItem = MenuItemSeparator | MenuItemIpc | MenuItemUrl | MenuItemLocal
+
+interface AppMeta extends HelpUrls {
+  productName: string
+  description: string
+  version: string
+}
+
+interface AboutDialog {
+  overlay: HTMLDivElement
+  dialog: HTMLDivElement
+  open: () => void
+  close: () => void
+}
+
+interface OpenMenuState {
+  menu: HTMLDivElement
+  button: HTMLElement
+  cleanup: () => void
+}
+
+export function createLinuxAppMenu(): {
+  bind: () => void
+  closeOpenMenu: () => void
+} {
   const isLinux = document.body.classList.contains('platform-linux')
   const HELP_URLS: any = {
     supportUrl: 'https://github.com/marcomoi395/hera-nest/issues',
@@ -8,7 +62,7 @@ export function createLinuxAppMenu() {
     websiteUrl: 'https://github.com/marcomoi395/hera-nest',
   }
 
-  const MENUS: Record<string, any[]> = {
+  const MENUS: Record<string, MenuItem[]> = {
     app: [
       { label: 'About Hera Nest', action: 'about', type: 'local' },
       { type: 'separator' },
@@ -17,7 +71,7 @@ export function createLinuxAppMenu() {
     window: [
       { label: 'Minimize', action: 'minimize-window', type: 'ipc' },
       { label: 'Zoom', action: 'toggle-maximize-window', type: 'ipc' },
-      { label: 'Close', action: 'close-window', type: 'ipc' },
+      { label: 'Close', action: 'close-window', type: 'ipc' }
     ],
     help: [
       { label: 'Support', action: 'supportUrl', type: 'url' },
@@ -33,11 +87,11 @@ export function createLinuxAppMenu() {
     productName: 'Hera Nest',
     description: 'DXF nesting desktop application with live preview and production DXF export.',
     version: '',
-    ...HELP_URLS,
+    ...HELP_URLS
   }
-  let aboutDialog: any = null
+  let aboutDialog: AboutDialog | null = null
 
-  function ensureAboutDialog() {
+  function ensureAboutDialog(): AboutDialog {
     if (aboutDialog) return aboutDialog
 
     const overlay = document.createElement('div')
@@ -70,28 +124,30 @@ export function createLinuxAppMenu() {
     overlay.appendChild(dialog)
     document.body.appendChild(overlay)
 
-    function close() {
+    function close(): void {
       overlay.hidden = true
     }
 
-    function open() {
+    function open(): void {
       updateAboutDialog()
       overlay.hidden = false
     }
 
-    overlay.addEventListener('click', event => {
+    overlay.addEventListener('click', (event) => {
       if (event.target === overlay) close()
     })
 
     dialog.querySelector('.linux-about-close')?.addEventListener('click', close)
-    dialog.querySelectorAll('[data-about-link]').forEach((button: any) => {
-      button.addEventListener('click', () => {
-        const url = appMeta[button.dataset.aboutLink] || HELP_URLS[button.dataset.aboutLink]
-        if (url) (window as any).electronAPI?.openExternalUrl?.(url)
+    dialog.querySelectorAll('[data-about-link]').forEach((button) => {
+      const buttonEl = button as HTMLButtonElement
+      buttonEl.addEventListener('click', () => {
+        const linkKey = buttonEl.dataset.aboutLink as keyof HelpUrls
+        const url = appMeta[linkKey] || HELP_URLS[linkKey]
+        if (url) window.electronAPI?.openExternalUrl?.(url)
       })
     })
 
-    document.addEventListener('keydown', event => {
+    document.addEventListener('keydown', (event) => {
       if (!overlay.hidden && event.key === 'Escape') close()
     })
 
@@ -99,7 +155,7 @@ export function createLinuxAppMenu() {
     return aboutDialog
   }
 
-  function updateAboutDialog() {
+  function updateAboutDialog(): void {
     const dialog = ensureAboutDialog().dialog
     if (dialog.querySelector('.linux-about-name')) dialog.querySelector('.linux-about-name').textContent = appMeta.productName || 'Hera Nest'
     if (dialog.querySelector('.linux-about-version')) dialog.querySelector('.linux-about-version').textContent = appMeta.version ? `Version ${appMeta.version}` : ''
@@ -107,9 +163,9 @@ export function createLinuxAppMenu() {
       appMeta.description || 'DXF nesting desktop application with live preview and production DXF export.'
   }
 
-  async function preloadAppMeta() {
+  async function preloadAppMeta(): Promise<void> {
     try {
-      const result = await (window as any).electronAPI?.getAppMeta?.()
+      const result = await window.electronAPI?.getAppMeta?.()
       if (result?.success && result.meta) {
         appMeta = { ...appMeta, ...result.meta }
         updateAboutDialog()
@@ -119,14 +175,17 @@ export function createLinuxAppMenu() {
     }
   }
 
-  async function invokeMenuItem(item: any) {
+  async function invokeMenuItem(item: MenuItem): Promise<void> {
+    if (item.type === 'separator') return
+
     if (item.type === 'ipc') {
-      await (window as any).electronAPI?.appMenuAction?.(item.action)
+      await window.electronAPI?.appMenuAction?.(item.action)
       return
     }
     if (item.type === 'url') {
-      const targetUrl = appMeta[item.action] || HELP_URLS[item.action]
-      if (targetUrl) await (window as any).electronAPI?.openExternalUrl?.(targetUrl)
+      const targetUrl =
+        appMeta[item.action as keyof HelpUrls] || HELP_URLS[item.action as keyof HelpUrls]
+      if (targetUrl) await window.electronAPI?.openExternalUrl?.(targetUrl)
       return
     }
     if (item.type === 'local' && item.action === 'about') {
@@ -134,7 +193,7 @@ export function createLinuxAppMenu() {
     }
   }
 
-  function closeOpenMenu() {
+  function closeOpenMenu(): void {
     if (!openMenuState) return
     const { menu, button, cleanup } = openMenuState
     cleanup()
@@ -144,7 +203,7 @@ export function createLinuxAppMenu() {
     openMenuState = null
   }
 
-  function positionMenu(button: HTMLElement, menu: HTMLElement) {
+  function positionMenu(button: HTMLElement, menu: HTMLElement): void {
     const rect = button.getBoundingClientRect()
     const gap = 4
     const menuRect = menu.getBoundingClientRect()
@@ -153,7 +212,7 @@ export function createLinuxAppMenu() {
     menu.style.top = `${rect.bottom + gap}px`
   }
 
-  function openMenu(button: HTMLElement, menuName: string) {
+  function openMenu(button: HTMLElement, menuName: string): void {
     const items = MENUS[menuName]
     if (!items?.length) return
 
@@ -167,7 +226,7 @@ export function createLinuxAppMenu() {
     menu.className = 'linux-menu-popup'
     menu.setAttribute('role', 'menu')
 
-    items.forEach(item => {
+    items.forEach((item) => {
       if (item.type === 'separator') {
         const separator = document.createElement('div')
         separator.className = 'linux-menu-separator'
@@ -192,12 +251,12 @@ export function createLinuxAppMenu() {
     button.classList.add('open')
     button.setAttribute('aria-expanded', 'true')
 
-    function onOutsidePointer(event: Event) {
+    function onOutsidePointer(event: Event): void {
       if (button.contains(event.target as Node) || menu.contains(event.target as Node)) return
       closeOpenMenu()
     }
 
-    function onKeydown(event: KeyboardEvent) {
+    function onKeydown(event: KeyboardEvent): void {
       if (event.key === 'Escape') {
         event.preventDefault()
         closeOpenMenu()
@@ -205,7 +264,7 @@ export function createLinuxAppMenu() {
       }
     }
 
-    function cleanup() {
+    function cleanup(): void {
       document.removeEventListener('pointerdown', onOutsidePointer, true)
       document.removeEventListener('keydown', onKeydown, true)
       window.removeEventListener('resize', closeOpenMenu, true)
@@ -220,22 +279,26 @@ export function createLinuxAppMenu() {
     openMenuState = { menu, button, cleanup }
   }
 
-  function bind() {
+  function bind(): void {
     if (!isLinux) return
     const menuBar = document.getElementById('linuxMenuBar')
     if (!menuBar) return
     menuBar.hidden = false
     preloadAppMeta()
     ensureAboutDialog()
-    menuBar.querySelectorAll('[data-linux-menu]').forEach((button: any) => {
-      button.setAttribute('aria-haspopup', 'menu')
-      button.setAttribute('aria-expanded', 'false')
-      button.addEventListener('click', () => openMenu(button, button.dataset.linuxMenu))
+    menuBar.querySelectorAll('[data-linux-menu]').forEach((button) => {
+      const buttonEl = button as HTMLElement
+      buttonEl.setAttribute('aria-haspopup', 'menu')
+      buttonEl.setAttribute('aria-expanded', 'false')
+      buttonEl.addEventListener('click', () => {
+        const menuName = buttonEl.dataset.linuxMenu
+        if (menuName) openMenu(buttonEl, menuName)
+      })
     })
   }
 
   return {
     bind,
-    closeOpenMenu,
+    closeOpenMenu
   }
 }

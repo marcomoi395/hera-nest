@@ -10,11 +10,16 @@ export const FALLBACK_PALETTE = [
   '#f77f4f'
 ]
 
-export function createLayerResolver(layerTable: Record<string, any>) {
+export function createLayerResolver(layerTable: Record<string, Record<string, unknown>>): {
+  layerColor: (name: string | null | undefined) => string
+  resolveEntityColor: (entity: Record<string, unknown> | null, fallbackLayer?: string) => string
+  findLayerDef: (name: string | null | undefined) => Record<string, unknown> | null
+  resolveLayerDefColor: (def: Record<string, unknown> | null) => string | null
+} {
   let paletteIndex = 0
   const colorCache: Record<string, string> = {}
 
-  function findLayerDef(name: string | null | undefined): any {
+  function findLayerDef(name: string | null | undefined): Record<string, unknown> | null {
     const key = String(name || '')
     if (layerTable[key]) return layerTable[key]
     const trimmed = key.trim()
@@ -23,7 +28,7 @@ export function createLayerResolver(layerTable: Record<string, any>) {
     return matchKey ? layerTable[matchKey] : null
   }
 
-  function resolveLayerDefColor(def: any): string | null {
+  function resolveLayerDefColor(def: Record<string, unknown> | null): string | null {
     if (!def) return null
     const explicitHex =
       normalizeHexColor(def.color) || normalizeHexColor(def.trueColor) || normalizeHexColor(def.rgb)
@@ -49,7 +54,7 @@ export function createLayerResolver(layerTable: Record<string, any>) {
     return colorCache[key]
   }
 
-  function resolveEntityColor(entity: any, fallbackLayer = '0'): string {
+  function resolveEntityColor(entity: Record<string, unknown> | null, fallbackLayer = '0'): string {
     if (!entity) return layerColor(fallbackLayer)
     const explicitHex = normalizeHexColor(entity.color) || normalizeHexColor(entity.trueColor)
     if (explicitHex) return explicitHex
@@ -59,11 +64,12 @@ export function createLayerResolver(layerTable: Record<string, any>) {
       entity.rawAciColor ?? entity.colorNumber ?? entity.colorIndex ?? entity.color
     )
     if (aci !== null) {
-      if (aci === 256 || aci === 0) return layerColor(entity.layer || fallbackLayer)
+      if (aci === 256 || aci === 0)
+        return layerColor((entity.layer as string | undefined) || fallbackLayer)
       const mapped = aciToHex(aci)
       if (mapped) return mapped
     }
-    return layerColor(entity.layer || fallbackLayer)
+    return layerColor((entity.layer as string | undefined) || fallbackLayer)
   }
 
   return {

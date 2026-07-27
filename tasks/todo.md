@@ -1,0 +1,10 @@
+- [ ] Task 1: Fix `src/main/ipc/export-dxf.ts` - Remove unused vars, fix `any` vs `never` params, type correctly `seed`/`nextRecord`.
+- [ ] Task 2: Fix `src/main/ipc/sparrow.ts` - Fix `PathLike` typing, `solution` prop on `never`, and `Strip` missing `index`.
+- [ ] Task 3: Consolidate Types - Merge `dxf.d.ts` into `dxf-types.ts`, `geometry.d.ts` into `geometry-types.ts`. Update `window.d.ts` / `ui-types.ts` imports.
+- [ ] Task 4: Fix Missing Globals/Globals Augmentation - Provide types for `JstsFactory`, `JstsGeometry`, `DxfPreviewData`, `DxfPreviewShape`, `DxfEntity`, `NestStrip` where `Cannot find name` is reported.
+- [ ] Task 5: Fix `ElectronAPI` Contract - Fix `openExternalUrl`, `getPathForDroppedFile`, `openFileDialog`, `parseDXF`, `saveJobState`, `loadJobState`, `runSparrow`, `chooseExportFolder` on `window.electronAPI` in renderer files to match `electron-api.d.ts`.
+- [ ] Task 6: Fix DXF Services (`dxf-service.ts`, `dxf-flatten-service.ts`, `dxf-raster-envelope-service.ts`, `dxf-export-metadata-service.ts`) - Fix arithmetic on `unknown`, missing properties (`start`, `end`, `x`, `y`, `z`, `vertices`), Iterator issues.
+- [ ] Task 7: Fix Shape/Contour Services (`dxf-shape-detection-service.ts`, `contour-detection-service.ts`, `contour-detection-jsts-service.ts`) - Fix `events`/`toJSON` on `{}` and global conversions.
+- [ ] Task 8: Fix Nesting Services (`nesting-service.ts`, `export-service.ts`, `tail-refinement.ts`) - Fix `never` types, missing `shouldSkipTailRefinement` and other nesting properties on `unknown`/`{}`.
+- [ ] Task 9: Fix Preview/Canvas (`dxf-preview-shapes-list.ts`, `dxf-preview-service.ts`, `canvas-view.ts`) - Fix `unknown` shapes/layers properties, strict null checks on DOM elements, `CanvasViewState` properties.
+- [ ] Task 10: Fix Panes/Modals (`files-pane.ts`, `sheets-pane.ts`, `settings-modal.ts`, `custom-selects.ts`, `linux-app-menu.ts`, `src/main.ts`) - Fix generic `Element` vs `HTMLSelectElement`, strictly type state injection.

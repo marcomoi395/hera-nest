@@ -33,3 +33,13 @@ export interface LayoutConfig {
   offsetX: number
   offsetY: number
 }
+
+export interface NestPlacementExportItem {
+  fileId: string
+  shapeId: string
+  x: number
+  y: number
+  rotation: number
+  stripIndex?: number
+  [key: string]: unknown
+}

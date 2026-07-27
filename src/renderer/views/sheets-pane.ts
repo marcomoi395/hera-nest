@@ -1,12 +1,20 @@
+import type { AppState } from '../state/store'
+import type { NestSheet } from '../../types/dxf-types'
+
+interface SheetsPaneDOMRefs {
+  sheetList: HTMLElement | null
+  addSheetBtn: HTMLButtonElement | null
+}
+
 interface SheetsPaneDeps {
-  state: any
-  dom: any
+  state: AppState
+  dom: SheetsPaneDOMRefs
   schedulePersistJobState: () => void
   getOpenSheetEditor: () => ((id: string | null) => void) | null
   renderTabs: () => void
 }
 
-interface SheetsPaneAPI {
+export interface SheetsPaneAPI {
   renderSheets: () => void
   bind: () => void
 }
@@ -26,11 +34,9 @@ export function createSheetsPane({
       dom.addSheetBtn.style.visibility = allowAnotherSheet ? 'visible' : 'hidden'
       dom.addSheetBtn.disabled = !allowAnotherSheet
     }
-    state.sheets.forEach((s: any) => {
+    state.sheets.forEach((s: NestSheet) => {
       const widthLabel =
-        s.widthMode === 'unlimited'
-          ? `${s.height} × Unlimited mm`
-          : `${s.height} × ${s.width} mm`
+        s.widthMode === 'unlimited' ? `${s.height} × Unlimited mm` : `${s.height} × ${s.width} mm`
       const modeLabel =
         s.widthMode === 'unlimited'
           ? 'Auto sheets · continuous strip'
@@ -59,13 +65,14 @@ export function createSheetsPane({
         const openSheetEditor = getOpenSheetEditor()
         if (openSheetEditor) openSheetEditor(s.id)
       })
+      if (!dom.sheetList) return
       dom.sheetList.appendChild(li)
     })
     dom.sheetList.querySelectorAll('.file-remove').forEach((btn: Element) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation()
         const buttonEl = btn as HTMLButtonElement
-        state.sheets = state.sheets.filter((x: any) => x.id !== buttonEl.dataset.id)
+        state.sheets = state.sheets.filter((x: NestSheet) => x.id !== buttonEl.dataset.id)
         renderSheets()
         renderTabs()
         schedulePersistJobState()

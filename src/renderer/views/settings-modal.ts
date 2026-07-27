@@ -1,16 +1,43 @@
 import { SETTINGS_DEFAULTS, normalizeSettings } from '../../shared/settings'
+import type { SettingsObject } from '../../types/settings'
 
-export function createSettingsModal(deps: {
-  state: any
-  dom: any
+export interface SettingsModalDeps {
+  state: {
+    settings: SettingsObject
+  }
+  dom: {
+    settingsModal: HTMLDivElement | null
+    settingsFields: HTMLInputElement[]
+    openSettings?: HTMLButtonElement | null
+    closeSettings?: HTMLButtonElement | null
+    applySettings?: HTMLButtonElement | null
+    resetSettings?: HTMLButtonElement | null
+    [key: string]: unknown
+  }
   onSettingsApplied: () => void
-}) {
+}
+
+export interface SettingsModalApi {
+  dialogDefaults: () => SettingsObject
+  currentNestingSettings: () => SettingsObject
+  loadPersistedSettings: () => Promise<void>
+  persistCurrentSettings: () => Promise<void>
+  applySettingsToDialog: (settings: SettingsObject) => void
+  bind: () => void
+}
+
+interface SettingField extends HTMLInputElement {
+  _syncCustomSelect?: () => void
+}
+export function createSettingsModal(deps: SettingsModalDeps): SettingsModalApi {
   const { state, dom, onSettingsApplied } = deps
-  const settingsFields = Array.from(dom.settingsFields || []) as HTMLInputElement[]
-  const devOnlyRows = Array.from(document.querySelectorAll('[data-dev-only-setting]')) as HTMLElement[]
+  const settingsFields = Array.from(dom.settingsFields || []) as SettingField[]
+  const devOnlyRows = Array.from(
+    document.querySelectorAll('[data-dev-only-setting]')
+  ) as HTMLElement[]
   let isDevBuild = false
 
-  function settingFieldValue(field: any): any {
+  function settingFieldValue(field: SettingField): string | number | boolean {
     if (field.type === 'checkbox') return field.checked
     if (field.type === 'number') {
       if (field.value === '') return ''
@@ -23,7 +50,7 @@ export function createSettingsModal(deps: {
     return field.value
   }
 
-  function applySettingFieldValue(field: any, value: any): void {
+  function applySettingFieldValue(field: SettingField, value: unknown): void {
     if (value === undefined) return
     if (field.type === 'checkbox') {
       field.checked = !!value
@@ -33,24 +60,27 @@ export function createSettingsModal(deps: {
     if (typeof field._syncCustomSelect === 'function') field._syncCustomSelect()
   }
 
-  function collectSettingsFromDialog(): any {
-    return settingsFields.reduce((acc: any, field: any) => {
-      acc[field.dataset.settingKey] = settingFieldValue(field)
-      return acc
-    }, {})
+  function collectSettingsFromDialog(): Record<string, string | number | boolean> {
+    return settingsFields.reduce(
+      (acc: Record<string, string | number | boolean>, field: SettingField) => {
+        acc[field.dataset.settingKey || ''] = settingFieldValue(field)
+        return acc
+      },
+      {}
+    )
   }
 
-  function dialogDefaults(): any {
+  function dialogDefaults(): SettingsObject {
     return { ...SETTINGS_DEFAULTS }
   }
 
   function applyDevOnlyVisibility(): void {
-    devOnlyRows.forEach(row => {
+    devOnlyRows.forEach((row) => {
       row.hidden = !isDevBuild
     })
   }
 
-  function normalizeDialogSettings(settings: any): any {
+  function normalizeDialogSettings(settings: Partial<SettingsObject>): SettingsObject {
     const normalized = normalizeSettings(settings)
     if (!isDevBuild) {
       normalized.sketchContourMethod = SETTINGS_DEFAULTS.sketchContourMethod
@@ -58,19 +88,21 @@ export function createSettingsModal(deps: {
     return normalized
   }
 
-  function applySettingsToDialog(settings: any): void {
-    settingsFields.forEach((field: any) => applySettingFieldValue(field, settings[field.dataset.settingKey]))
+  function applySettingsToDialog(settings: SettingsObject): void {
+    settingsFields.forEach((field: SettingField) =>
+      applySettingFieldValue(field, settings[field.dataset.settingKey as keyof SettingsObject])
+    )
   }
 
-  function currentNestingSettings(): any {
+  function currentNestingSettings(): SettingsObject {
     return { ...dialogDefaults(), ...state.settings }
   }
 
   async function persistCurrentSettings(): Promise<void> {
     state.settings = normalizeDialogSettings(collectSettingsFromDialog())
     applySettingsToDialog(state.settings)
-    if (!(window as any).electronAPI?.saveAppSettings) return
-    const result = await (window as any).electronAPI.saveAppSettings(state.settings)
+    if (!window.electronAPI?.saveAppSettings) return
+    const result = await window.electronAPI.saveAppSettings(state.settings)
     if (!result?.success) {
       throw new Error(result?.error || 'Failed to save settings')
     }
@@ -78,9 +110,9 @@ export function createSettingsModal(deps: {
 
   async function loadPersistedSettings(): Promise<void> {
     const defaults = dialogDefaults()
-    if ((window as any).electronAPI?.getNativeEngineInfo) {
+    if (window.electronAPI?.getNativeEngineInfo) {
       try {
-        const engineInfo = await (window as any).electronAPI.getNativeEngineInfo()
+        const engineInfo = await window.electronAPI.getNativeEngineInfo()
         isDevBuild = !!(engineInfo?.success && !engineInfo?.packaged)
       } catch {
         isDevBuild = false
@@ -91,8 +123,8 @@ export function createSettingsModal(deps: {
     state.settings = normalizeDialogSettings(defaults)
     applySettingsToDialog(state.settings)
 
-    if (!(window as any).electronAPI?.loadAppSettings) return
-    const result = await (window as any).electronAPI.loadAppSettings()
+    if (!window.electronAPI?.loadAppSettings) return
+    const result = await window.electronAPI.loadAppSettings()
     if (!result?.success) {
       console.warn('[Settings] Failed to load persisted settings:', result?.error)
       return
@@ -103,12 +135,12 @@ export function createSettingsModal(deps: {
   }
 
   function bind(): void {
-    dom.openSettings?.addEventListener('click', () => dom.settingsModal.classList.add('open'))
-    dom.closeSettings?.addEventListener('click', () => dom.settingsModal.classList.remove('open'))
+    dom.openSettings?.addEventListener('click', () => dom.settingsModal?.classList.add('open'))
+    dom.closeSettings?.addEventListener('click', () => dom.settingsModal?.classList.remove('open'))
     dom.applySettings?.addEventListener('click', async () => {
       try {
         await persistCurrentSettings()
-        dom.settingsModal.classList.remove('open')
+        dom.settingsModal?.classList.remove('open')
         if (typeof onSettingsApplied === 'function') onSettingsApplied()
       } catch (err) {
         console.error('[Settings] Failed to persist settings:', err)
@@ -132,6 +164,6 @@ export function createSettingsModal(deps: {
     loadPersistedSettings,
     persistCurrentSettings,
     applySettingsToDialog,
-    bind,
+    bind
   }
 }

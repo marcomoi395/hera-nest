@@ -1,4 +1,5 @@
 import { effectiveStripDensity } from './nest-result-scoring'
+import type { Strip } from '../../types/dxf-types'
 
 export interface ItemCount {
   item_id: number
@@ -22,11 +23,12 @@ export interface TailRefinementScore {
   totalItemCount: number
 }
 
-export function itemCountsToMap(counts: any[] | null | undefined): Map<number, number> {
+export function itemCountsToMap(counts: unknown[] | null | undefined): Map<number, number> {
   const map = new Map<number, number>()
   ;(Array.isArray(counts) ? counts : []).forEach((entry) => {
-    const itemId = Number(entry?.item_id)
-    const count = Math.trunc(Number(entry?.count))
+    const record = entry as Record<string, unknown>
+    const itemId = Number(record?.item_id)
+    const count = Math.trunc(Number(record?.count))
     if (!Number.isFinite(itemId) || count <= 0) return
     map.set(itemId, count)
   })
@@ -39,11 +41,11 @@ function mapToSortedCounts(map: Map<number, number>): ItemCount[] {
     .map(([item_id, count]) => ({ item_id, count }))
 }
 
-function hasUsablePlacedItemCounts(strip: any): boolean {
-  return itemCountsToMap(strip?.placed_item_counts).size > 0
+function hasUsablePlacedItemCounts(strip: Record<string, unknown>): boolean {
+  return itemCountsToMap(strip?.placed_item_counts as unknown[] | null | undefined).size > 0
 }
 
-function combineTailCounts(strips: any[]): ItemCount[] {
+function combineTailCounts(strips: Strip[]): ItemCount[] {
   const combined = new Map<number, number>()
   strips.forEach((strip) => {
     itemCountsToMap(strip?.placed_item_counts).forEach((count, itemId) => {
@@ -53,7 +55,10 @@ function combineTailCounts(strips: any[]): ItemCount[] {
   return mapToSortedCounts(combined)
 }
 
-export function shouldSkipTailRefinement(summary: any, sheet: any): boolean {
+export function shouldSkipTailRefinement(
+  summary: Record<string, unknown>,
+  sheet: Record<string, unknown>
+): boolean {
   const strips = Array.isArray(summary?.strips) ? summary.strips : []
   if (!strips.length) return true
   if (sheet?.widthMode === 'unlimited') return true
@@ -62,9 +67,9 @@ export function shouldSkipTailRefinement(summary: any, sheet: any): boolean {
 }
 
 export function buildTailRefinementCandidates(
-  summary: any,
-  payload: any,
-  options: any = {}
+  summary: Record<string, unknown>,
+  payload: Record<string, unknown>,
+  options: Record<string, unknown> = {}
 ): TailRefinementCandidate[] {
   void payload
   void options
@@ -85,7 +90,10 @@ export function buildTailRefinementCandidates(
   ]
 }
 
-export function buildTailSubsetPayload(payload: any, candidate: TailRefinementCandidate): any {
+export function buildTailSubsetPayload(
+  payload: Record<string, unknown>,
+  candidate: TailRefinementCandidate
+): Record<string, unknown> {
   const itemCounts = itemCountsToMap(candidate?.itemCounts)
   const baseName = payload?.name || 'nesting-job'
   const filteredItems = (Array.isArray(payload?.items) ? payload.items : []).filter((item) =>
@@ -105,10 +113,10 @@ export function buildTailSubsetPayload(payload: any, candidate: TailRefinementCa
 }
 
 export function mergeTailReplacement(
-  baseSummary: any,
-  replacementSummary: any,
+  baseSummary: Record<string, unknown>,
+  replacementSummary: Record<string, unknown>,
   candidate: TailRefinementCandidate
-): any {
+): Record<string, unknown> | null {
   const baseStrips = Array.isArray(baseSummary?.strips) ? baseSummary.strips : []
   const replacementStrips = Array.isArray(replacementSummary?.strips)
     ? replacementSummary.strips
@@ -133,7 +141,10 @@ export function mergeTailReplacement(
   }
 }
 
-export function scoreTailRefinementSummary(summary: any, sheet: any): TailRefinementScore {
+export function scoreTailRefinementSummary(
+  summary: Record<string, unknown>,
+  sheet: Record<string, unknown>
+): TailRefinementScore {
   const strips = Array.isArray(summary?.strips) ? summary.strips : []
   if (!strips.length) {
     return {
@@ -149,7 +160,7 @@ export function scoreTailRefinementSummary(summary: any, sheet: any): TailRefine
   const lastDensity = effectiveStripDensity(lastStrip, sheet)
   const lastStripWidth = Number(lastStrip.strip_width) || Infinity
   const totalItemCount = strips.reduce(
-    (sum: number, strip: any) => sum + (Number(strip?.item_count) || 0),
+    (sum: number, strip: Record<string, unknown>) => sum + (Number(strip?.item_count) || 0),
     0
   )
 

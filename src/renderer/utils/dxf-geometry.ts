@@ -1,4 +1,4 @@
-import type { Point } from '../../types/geometry'
+import type { Point } from '../../types/geometry-types'
 
 export const EPS = 1e-6
 export const TWO_PI = Math.PI * 2
@@ -36,7 +36,7 @@ export function samePoint(
   return !!a && !!b && Math.abs(a.x - b.x) <= eps && Math.abs(a.y - b.y) <= eps
 }
 
-export function getLineEndpoints(ent: any): { start: Point; end: Point } | null {
+export function getLineEndpoints(ent: DXFEntity): { start: Point; end: Point } | null {
   if (!ent || ent.type !== 'LINE') return null
   if (
     ent.start &&
@@ -63,7 +63,7 @@ export function getLineEndpoints(ent: any): { start: Point; end: Point } | null 
   return null
 }
 
-export function getArcEndpoints(ent: any): { start: Point; end: Point } | null {
+export function getArcEndpoints(ent: DXFEntity): { start: Point; end: Point } | null {
   if (!ent || ent.type !== 'ARC' || !ent.center || !Number.isFinite(ent.radius)) return null
   const startAngle = Number.isFinite(ent.startAngle) ? ent.startAngle : 0
   const endAngle = Number.isFinite(ent.endAngle) ? ent.endAngle : 0
@@ -102,7 +102,7 @@ export function normalizedClosedPointSignature(points: Point[], precision = 1e-4
   if (!ring.length) return ''
   const forward = ring.map((point) => pointSig(point, precision))
   const backward = [...forward].reverse()
-  const rotations = (sequence: string[]) => {
+  const rotations = (sequence: string[]): string[] => {
     const out: string[] = []
     for (let i = 0; i < sequence.length; i++) {
       out.push(sequence.slice(i).concat(sequence.slice(0, i)).join('|'))
@@ -243,7 +243,7 @@ export function bulgeToPoints(start: Point, end: Point, bulge: number, maxStepDe
   return points
 }
 
-export function ellipseToPoints(ent: any, forceClosed = false): Point[] {
+export function ellipseToPoints(ent: DXFEntity, forceClosed = false): Point[] {
   if (!ent.center || !ent.majorAxisEndPoint) return []
   const rx = Math.hypot(ent.majorAxisEndPoint.x, ent.majorAxisEndPoint.y)
   const ry = rx * Math.abs(ent.axisRatio || 1)
@@ -291,7 +291,7 @@ export function ellipseToPoints(ent: any, forceClosed = false): Point[] {
   return dedupePoints(points, closed)
 }
 
-export function polylineVerticesToPoints(vertices: any[], close = true): Point[] {
+export function polylineVerticesToPoints(vertices: DXFVertex[], close = true): Point[] {
   if (!vertices || vertices.length < 2) return []
   const points = [{ x: vertices[0].x, y: vertices[0].y }]
   for (let i = 0; i < vertices.length - 1; i++) {
@@ -304,15 +304,15 @@ export function polylineVerticesToPoints(vertices: any[], close = true): Point[]
   return dedupePoints(points, close)
 }
 
-export function splineToPoints(ent: any): Point[] {
+export function splineToPoints(ent: DXFEntity): Point[] {
   const raw = ent.fitPoints && ent.fitPoints.length > 1 ? ent.fitPoints : ent.controlPoints || []
   return dedupePoints(
-    raw.map((point: any) => ({ x: point.x, y: point.y })),
+    raw.map((point: Point) => ({ x: point.x, y: point.y })),
     !!ent.closed
   )
 }
 
-export function circleToPoints(ent: any): Point[] {
+export function circleToPoints(ent: DXFEntity): Point[] {
   if (!ent.center || !ent.radius || ent.radius < EPS) return []
   const steps = 48
   const points: Point[] = []
@@ -326,7 +326,7 @@ export function circleToPoints(ent: any): Point[] {
   return points
 }
 
-export function samplePoint(ent: any): Point | null {
+export function samplePoint(ent: DXFEntity): Point | null {
   if (!ent || typeof ent !== 'object') return null
   switch (ent.type) {
     case 'CIRCLE':
@@ -347,13 +347,13 @@ export function samplePoint(ent: any): Point | null {
     case 'POLYLINE':
       return (
         ent.vertices?.find(
-          (vertex: any) => Number.isFinite(vertex?.x) && Number.isFinite(vertex?.y)
+          (vertex: DXFVertex) => Number.isFinite(vertex?.x) && Number.isFinite(vertex?.y)
         ) || null
       )
     case 'SPLINE': {
       const points = ent.fitPoints && ent.fitPoints.length ? ent.fitPoints : ent.controlPoints || []
       const valid = points.filter(
-        (point: any) => Number.isFinite(point?.x) && Number.isFinite(point?.y)
+        (point: Point) => Number.isFinite(point?.x) && Number.isFinite(point?.y)
       )
       return valid[Math.floor(valid.length / 2)] || null
     }
@@ -362,10 +362,10 @@ export function samplePoint(ent: any): Point | null {
   }
 }
 
-export function safeSamplePoint(ent: any): Point | null {
+export function safeSamplePoint(ent: DXFEntity): Point | null {
   try {
     return samplePoint(ent)
-  } catch (_) {
+  } catch {
     return null
   }
 }
@@ -383,7 +383,7 @@ export function angleDelta(a: Point, b: Point): number {
   return Math.abs(Math.atan2(cross, dot))
 }
 
-export function entityBBox(ent: any): BoundingBox | null {
+export function entityBBox(ent: DXFEntity): BoundingBox | null {
   const xs: number[] = []
   const ys: number[] = []
   switch (ent.type) {

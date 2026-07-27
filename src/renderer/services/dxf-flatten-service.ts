@@ -1,7 +1,64 @@
-import type { Point } from '../../types/geometry'
-// @ts-ignore - Flatten.js loaded globally via window
-declare const Flatten: any
+import type { Point } from '../../types/geometry-types'
 
+// Type definitions for Flatten.js library
+interface FlattenPoint {
+  x: number
+  y: number
+}
+
+interface FlattenSegment {
+  ps: FlattenPoint
+  pe: FlattenPoint
+  start: FlattenPoint
+  end: FlattenPoint
+  intersect: (other: FlattenSegment) => unknown[]
+  distanceTo?: (point: FlattenPoint) => [number]
+}
+
+interface FlattenArc {
+  pc: FlattenPoint
+  r: number
+  startAngle: number
+  sweep: number
+  counterClockwise: boolean
+}
+
+interface FlattenPolygon {
+  addFace: (shapes: unknown[]) => void
+  contains: (point: FlattenPoint) => boolean
+  faces: unknown[]
+}
+
+interface FlattenEdge {
+  shape: FlattenSegment | FlattenArc | unknown
+}
+
+interface BBox {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+interface VertexWithBulge {
+  x: number
+  y: number
+  bulge?: number
+}
+
+interface FlattenRecord {
+  entity: Record<string, unknown>
+  bbox: BBox
+  segments: FlattenSegment[]
+  polygon: FlattenPolygon | null
+  samplePoint: Point | null
+}
+
+interface PolygonResult {
+  polygonPoints: Point[]
+  area: number
+  faceCount: number
+}
 
 import {
   EPS,
@@ -19,6 +76,9 @@ import {
   closePointRing
 } from '../utils/dxf-geometry'
 
+type FlattenShape = unknown
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isEntityClosed(entity: any): boolean {
   if (!entity?.type) return false
   if (entity.type === 'CIRCLE') return true
@@ -39,6 +99,7 @@ export function isEntityClosed(entity: any): boolean {
   return false
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function sampleArcPoints(entity: any): Point[] {
   if (!entity?.center || !Number.isFinite(entity.radius)) return []
   const start = Number.isFinite(entity.startAngle) ? entity.startAngle : 0
@@ -59,7 +120,7 @@ export function sampleArcPoints(entity: any): Point[] {
   return points
 }
 
-export function entityToPolylinePoints(entity: any): Point[] {
+export function entityToPolylinePoints(entity: DxfEntity): Point[] {
   if (!entity?.type) return []
   switch (entity.type) {
     case 'LINE': {
@@ -84,9 +145,9 @@ export function entityToPolylinePoints(entity: any): Point[] {
   }
 }
 
-function polylineShapesFromVertices(vertices: any[], close: boolean): any[] {
+function polylineShapesFromVertices(vertices: VertexWithBulge[], close: boolean): FlattenShape[] {
   if (!Array.isArray(vertices) || vertices.length < 2) return []
-  const shapes: any[] = []
+  const shapes: FlattenShape[] = []
   const segmentCount = close ? vertices.length : vertices.length - 1
   for (let i = 0; i < segmentCount; i++) {
     const start = vertices[i]
@@ -96,27 +157,28 @@ function polylineShapesFromVertices(vertices: any[], close: boolean): any[] {
     if (Math.abs(bulge) > EPS) {
       const arc = bulgeToArcInfo(start, end, bulge)
       if (arc && Number.isFinite(arc.radius) && arc.radius > EPS) {
-        shapes.push(new Flatten.Arc(
-          new Flatten.Point(arc.center.x, arc.center.y),
-          arc.radius,
-          arc.startAngle,
-          arc.endAngle,
-          arc.theta >= 0
-        ))
+        shapes.push(
+          new Flatten.Arc(
+            new Flatten.Point(arc.center.x, arc.center.y),
+            arc.radius,
+            arc.startAngle,
+            arc.endAngle,
+            arc.theta >= 0
+          )
+        )
         continue
       }
     }
     if (Math.hypot(end.x - start.x, end.y - start.y) <= EPS) continue
-    shapes.push(new Flatten.Segment(
-      new Flatten.Point(start.x, start.y),
-      new Flatten.Point(end.x, end.y)
-    ))
+    shapes.push(
+      new Flatten.Segment(new Flatten.Point(start.x, start.y), new Flatten.Point(end.x, end.y))
+    )
   }
   return shapes
 }
 
-function sampledSegmentShapes(points: Point[], close: boolean): any[] {
-  const shapes: any[] = []
+function sampledSegmentShapes(points: Point[], close: boolean): FlattenSegment[] {
+  const shapes: FlattenSegment[] = []
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i]
     const b = points[i + 1]
@@ -134,7 +196,8 @@ function sampledSegmentShapes(points: Point[], close: boolean): any[] {
   return shapes
 }
 
-function entityToFlattenPolygon(entity: any): any {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function entityToFlattenPolygon(entity: any): FlattenPolygon | null {
   if (!isEntityClosed(entity)) return null
   try {
     if (entity.type === 'CIRCLE' && entity.center && Number.isFinite(entity.radius)) {
@@ -148,7 +211,11 @@ function entityToFlattenPolygon(entity: any): any {
       return polygon
     }
 
-    if ((entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') && Array.isArray(entity.vertices) && entity.vertices.length >= 2) {
+    if (
+      (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') &&
+      Array.isArray(entity.vertices) &&
+      entity.vertices.length >= 2
+    ) {
       const shapes = polylineShapesFromVertices(entity.vertices, entity.closed !== false)
       if (!shapes.length) return null
       const polygon = new Flatten.Polygon()
@@ -169,7 +236,7 @@ function entityToFlattenPolygon(entity: any): any {
   return null
 }
 
-function sampleFlattenArc(arc: any, includeStart = true): Point[] {
+function sampleFlattenArc(arc: FlattenArc, includeStart = true): Point[] {
   const delta = arc.counterClockwise ? arc.sweep : -arc.sweep
   const steps = Math.max(12, Math.ceil(Math.abs(delta) / (Math.PI / 18)))
   const points: Point[] = []
@@ -185,29 +252,33 @@ function sampleFlattenArc(arc: any, includeStart = true): Point[] {
   return points
 }
 
-function faceToPoints(face: any): Point[] {
+function faceToPoints(face: FlattenEdge[]): Point[] {
   const points: Point[] = []
   for (const edge of face) {
     const shape = edge.shape
     if (!shape) continue
     if (shape instanceof Flatten.Segment) {
-      if (!points.length) points.push({ x: shape.start.x, y: shape.start.y })
-      points.push({ x: shape.end.x, y: shape.end.y })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const seg = shape as any
+      if (!points.length) points.push({ x: seg.start.x, y: seg.start.y })
+      points.push({ x: seg.end.x, y: seg.end.y })
       continue
     }
     if (shape instanceof Flatten.Arc) {
-      points.push(...sampleFlattenArc(shape, !points.length))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      points.push(...sampleFlattenArc(shape as any, !points.length))
     }
   }
   return closePointRing(points)
 }
 
-export function entityToFlattenRecord(entity: any): any {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function entityToFlattenRecord(entity: DxfEntity): any {
   const points = entityToPolylinePoints(entity)
   const bbox = entityBBox(entity)
   if (!bbox) return null
 
-  const segments: any[] = []
+  const segments: FlattenShape[] = []
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i]
     const b = points[i + 1]
@@ -226,7 +297,7 @@ export function entityToFlattenRecord(entity: any): any {
   let polygon = null
   if (isEntityClosed(entity) && points.length >= 3) {
     try {
-      polygon = new Flatten.Polygon(points.map(point => [point.x, point.y]))
+      polygon = new Flatten.Polygon(points.map((point) => [point.x, point.y]))
     } catch {
       polygon = null
     }
@@ -243,7 +314,8 @@ export function entityToFlattenRecord(entity: any): any {
   }
 }
 
-export function sampledClosedEntityPolygon(entity: any): any {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function sampledClosedEntityPolygon(entity: DxfEntity): any {
   if (!isEntityClosed(entity)) return null
   const polygonPoints = closePointRing(entityToPolylinePoints(entity))
   if (polygonPoints.length < 4) return null
@@ -256,18 +328,19 @@ export function sampledClosedEntityPolygon(entity: any): any {
   }
 }
 
-export function extractPolygonForEntities(entities: any[]): any {
+export function extractPolygonForEntities(
+  entities: Record<string, unknown>[]
+): PolygonResult | null {
   const polygonEntries = entities
-    .map(entity => ({
+    .map((entity) => ({
       entity,
       polygon: entityToFlattenPolygon(entity)
     }))
-    .filter(entry => entry.polygon)
+    .filter((entry) => entry.polygon)
   if (!polygonEntries.length) return null
 
-  const sampledFallback = polygonEntries.length === 1
-    ? sampledClosedEntityPolygon(polygonEntries[0].entity)
-    : null
+  const sampledFallback =
+    polygonEntries.length === 1 ? sampledClosedEntityPolygon(polygonEntries[0].entity) : null
 
   let merged = polygonEntries[0].polygon
   for (let i = 1; i < polygonEntries.length; i++) {
@@ -279,20 +352,21 @@ export function extractPolygonForEntities(entities: any[]): any {
     }
   }
 
-  const faces = [...merged.faces]
+  const faces = [...merged!.faces]
   if (!faces.length) return sampledFallback
 
-  const rankedFaces = faces
-    .slice()
-    .sort((a, b) => {
-      const areaDelta = Math.abs(b.area()) - Math.abs(a.area())
-      if (Math.abs(areaDelta) > EPS) return areaDelta
-      return Math.abs(b.orientation()) - Math.abs(a.orientation())
-    })
-  const primary = rankedFaces[0]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rankedFaces = faces.slice().sort((a: any, b: any) => {
+    const areaDelta = Math.abs(b.area()) - Math.abs(a.area())
+    if (Math.abs(areaDelta) > EPS) return areaDelta
+    return Math.abs(b.orientation()) - Math.abs(a.orientation())
+  })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const primary: any = rankedFaces[0]
   if (!primary) return sampledFallback
 
-  const polygonPoints = faceToPoints(primary)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const polygonPoints = faceToPoints(primary as any)
   if (polygonPoints.length < 4) return sampledFallback
 
   const primaryArea = Math.abs(primary.area())
@@ -301,8 +375,10 @@ export function extractPolygonForEntities(entities: any[]): any {
     const sampledRatioMin = sampledArea * 0.25
     const sampledRatioMax = sampledArea * 4
     const polygonArea = Math.abs(polygonSignedArea(polygonPoints.slice(0, -1)))
-    const referenceArea = Number.isFinite(polygonArea) && polygonArea > EPS ? polygonArea : primaryArea
-    const suspiciousMismatch = !Number.isFinite(referenceArea) ||
+    const referenceArea =
+      Number.isFinite(polygonArea) && polygonArea > EPS ? polygonArea : primaryArea
+    const suspiciousMismatch =
+      !Number.isFinite(referenceArea) ||
       referenceArea <= EPS ||
       referenceArea < sampledRatioMin ||
       referenceArea > sampledRatioMax
@@ -317,44 +393,52 @@ export function extractPolygonForEntities(entities: any[]): any {
   }
 }
 
-function bboxGap(a: any, b: any): number {
+function bboxGap(a: BBox, b: BBox): number {
   const dx = Math.max(0, a.minX - b.maxX, b.minX - a.maxX)
   const dy = Math.max(0, a.minY - b.maxY, b.minY - a.maxY)
   return Math.hypot(dx, dy)
 }
 
-function recordsConnected(a: any, b: any): boolean {
+function recordsConnected(a: FlattenRecord, b: FlattenRecord): boolean {
   if (!a || !b) return false
   if (bboxGap(a.bbox, b.bbox) > LOOP_TOLERANCE * 20) return false
 
   for (const sa of a.segments) {
     for (const sb of b.segments) {
       if (sa.intersect(sb).length) return true
-      if (sa.ps.distanceTo(sb.ps)[0] <= LOOP_TOLERANCE) return true
-      if (sa.ps.distanceTo(sb.pe)[0] <= LOOP_TOLERANCE) return true
-      if (sa.pe.distanceTo(sb.ps)[0] <= LOOP_TOLERANCE) return true
-      if (sa.pe.distanceTo(sb.pe)[0] <= LOOP_TOLERANCE) return true
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((sa.ps as any).distanceTo(sb.ps)[0] <= LOOP_TOLERANCE) return true
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((sa.ps as any).distanceTo(sb.pe)[0] <= LOOP_TOLERANCE) return true
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((sa.pe as any).distanceTo(sb.ps)[0] <= LOOP_TOLERANCE) return true
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((sa.pe as any).distanceTo(sb.pe)[0] <= LOOP_TOLERANCE) return true
     }
   }
 
   if (a.polygon && b.samplePoint) {
     try {
       if (a.polygon.contains(new Flatten.Point(b.samplePoint.x, b.samplePoint.y))) return true
-    } catch {}
+    } catch {
+      // Intentionally ignore polygon containment errors - allows partial geometry extraction
+      // when dealing with malformed or degenerate DXF geometry
+    }
   }
   if (b.polygon && a.samplePoint) {
     try {
       if (b.polygon.contains(new Flatten.Point(a.samplePoint.x, a.samplePoint.y))) return true
-    } catch {}
+    } catch {
+      // Intentionally ignore polygon containment errors - allows partial geometry extraction
+      // when dealing with malformed or degenerate DXF geometry
+    }
   }
 
   return false
 }
 
-export function buildSketchGroups(entities: any[]): any[][] {
-  const records = entities
-    .map(entityToFlattenRecord)
-    .filter(Boolean)
+export function buildSketchGroups(entities: DxfEntity[]): DxfEntity[][] {
+  const records = entities.map(entityToFlattenRecord).filter(Boolean)
   if (!records.length) return []
 
   const parent = records.map((_, index) => index)
@@ -366,7 +450,7 @@ export function buildSketchGroups(entities: any[]): any[][] {
     }
     return current
   }
-  const union = (a: number, b: number) => {
+  const union = (a: number, b: number): void => {
     const ra = find(a)
     const rb = find(b)
     if (ra !== rb) parent[rb] = ra
@@ -378,7 +462,7 @@ export function buildSketchGroups(entities: any[]): any[][] {
     }
   }
 
-  const groups = new Map<number, any[]>()
+  const groups = new Map<number, Record<string, unknown>[]>()
   records.forEach((record, index) => {
     const root = find(index)
     if (!groups.has(root)) groups.set(root, [])

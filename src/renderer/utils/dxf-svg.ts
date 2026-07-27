@@ -1,4 +1,4 @@
-import type { Point } from '../../types/geometry'
+import type { DxfEntity, Point } from '../../types/dxf-types'
 import { getLineEndpoints, polylineVerticesToPoints, TWO_PI } from './dxf-geometry'
 
 /**
@@ -43,8 +43,8 @@ export function pathFromPoints(
   close = true
 ): string {
   if (!points || points.length < 2) return ''
-  const tx = (point: Point) => point.x - ox
-  const ty = (point: Point) => originMaxY - point.y
+  const tx = (point: Point): number => point.x - ox
+  const ty = (point: Point): number => originMaxY - point.y
   let d = `M${f(tx(points[0]))},${f(ty(points[0]))}`
   for (let i = 1; i < points.length; i++) {
     d += ` L${f(tx(points[i]))},${f(ty(points[i]))}`
@@ -58,18 +58,18 @@ export function pathFromPoints(
  * coordinate flip. Full circles are handled by CIRCLE entities elsewhere;
  * ARC entities remain open so the preview matches the source geometry.
  */
-export function arcEntPath(ent: any, ox: number, originMaxY: number): string {
+export function arcEntPath(ent: DxfEntity, ox: number, originMaxY: number): string {
   if (!ent.center || !Number.isFinite(ent.radius)) return ''
   const cx = ent.center.x - ox
   const cy = originMaxY - ent.center.y
-  const r = ent.radius
-  const sR = ent.startAngle || 0
-  const eR = ent.endAngle || 0
+  const r = ent.radius ?? 0
+  const sR = ent.startAngle ?? 0
+  const eR = ent.endAngle ?? 0
   const x1 = cx + r * Math.cos(sR)
   const y1 = cy - r * Math.sin(sR)
   const x2 = cx + r * Math.cos(eR)
   const y2 = cy - r * Math.sin(eR)
-  let span = Number.isFinite(ent.angleLength) ? ent.angleLength : eR - sR
+  let span = Number.isFinite(ent.angleLength) ? (ent.angleLength ?? 0) : eR - sR
   if (span <= 0) span += TWO_PI
   const large = span > Math.PI ? 1 : 0
   return `M${f(x1)},${f(y1)} A${f(r)},${f(r)},0,${large},0,${f(x2)},${f(y2)}`
@@ -80,10 +80,10 @@ export function arcEntPath(ent: any, ox: number, originMaxY: number): string {
  * tangent estimation, giving a visually accurate curve without needing
  * full B-spline evaluation.
  */
-export function splinePath(ent: any, ox: number, originMaxY: number): string {
+export function splinePath(ent: DxfEntity, ox: number, originMaxY: number): string {
   const raw = ent.fitPoints && ent.fitPoints.length > 1 ? ent.fitPoints : ent.controlPoints || []
   if (raw.length < 2) return ''
-  const pts = raw.map((point: any) => ({ x: point.x - ox, y: originMaxY - point.y }))
+  const pts = raw.map((point: Point) => ({ x: point.x - ox, y: originMaxY - point.y }))
   let d = `M${f(pts[0].x)},${f(pts[0].y)}`
   if (pts.length === 2) return d + ` L${f(pts[1].x)},${f(pts[1].y)}`
   for (let i = 0; i < pts.length - 1; i++) {
@@ -105,7 +105,12 @@ export function splinePath(ent: any, ox: number, originMaxY: number): string {
  * returns a ready-to-embed SVG element string. Used to render decor items
  * (non-outline entities) inside shape preview thumbnails.
  */
-export function entityToSVGStr(ent: any, ox: number, originMaxY: number, color: string): string {
+export function entityToSVGStr(
+  ent: DxfEntity,
+  ox: number,
+  originMaxY: number,
+  color: string
+): string {
   const sw = `stroke="${color}" stroke-width="0.8" opacity="0.85" fill="none"`
   switch (ent.type) {
     case 'LINE': {
@@ -121,7 +126,7 @@ export function entityToSVGStr(ent: any, ox: number, originMaxY: number, color: 
       if (!ent.center || !Number.isFinite(ent.radius)) return ''
       const cx = f(ent.center.x - ox)
       const cy = f(originMaxY - ent.center.y)
-      const r = f(ent.radius)
+      const r = f(ent.radius ?? 0)
       return `<circle cx="${cx}" cy="${cy}" r="${r}" ${sw}/>`
     }
     case 'ARC': {

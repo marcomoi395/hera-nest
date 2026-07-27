@@ -1,5 +1,5 @@
-import type { DxfFile, NestSheet } from '../../types/dxf'
-import type { SettingsObject } from '../../types/settings'
+import type { DxfFile, NestSheet, NestResult } from '../../types/dxf-types'
+import type { SettingsObject, NestPlacementExportItem } from '../../types/settings'
 import { clonePlain, effectiveFileQty } from '../helpers'
 
 export interface AppState {
@@ -7,12 +7,12 @@ export interface AppState {
   sheets: NestSheet[]
   status: string
   zoom: number
-  nestResult: any | null
+  nestResult: NestResult | null
   lastExportPath: string | null
   settings: SettingsObject
   editingSheetId: string | null
   activeStripIndex: number
-  lastPlacementExportItems: any | null
+  lastPlacementExportItems: NestPlacementExportItem[] | null
   nestInputPath: string | null
 }
 
@@ -32,28 +32,19 @@ export const state: AppState = {
 
 let persistJobTimer: number | null = null
 
-export function snapshotJobState() {
+export function snapshotJobState(): AppState {
   return {
-    files: state.files.map((file: any) => ({
-      id: file.id,
-      name: file.name,
-      size: file.size || 0,
-      path: file.path || null,
-      bookmark: file.bookmark || null,
-      qty: effectiveFileQty(file),
-      shapes: clonePlain(file.shapes || null),
-      layers: clonePlain(file.layers || null),
-      _multiSketchDetection:
-        typeof file._multiSketchDetection === 'boolean' ? file._multiSketchDetection : null,
-      _sketchContourMethod: file._sketchContourMethod || null
-    })),
-    sheets: state.sheets.map((sheet: any) => ({
-      id: sheet.id,
-      width: sheet.width ?? null,
-      height: sheet.height ?? null,
-      widthMode: sheet.widthMode || 'fixed',
-      material: sheet.material || ''
-    }))
+    files: clonePlain(state.files),
+    sheets: clonePlain(state.sheets),
+    status: state.status,
+    zoom: state.zoom,
+    nestResult: clonePlain(state.nestResult),
+    lastExportPath: state.lastExportPath,
+    settings: clonePlain(state.settings),
+    editingSheetId: state.editingSheetId,
+    activeStripIndex: state.activeStripIndex,
+    lastPlacementExportItems: clonePlain(state.lastPlacementExportItems),
+    nestInputPath: state.nestInputPath
   }
 }
 
@@ -82,25 +73,22 @@ export async function hydrateJobState(): Promise<boolean> {
   }
   if (!result.state) return false
 
-  state.files = Array.isArray((result.state as any).files)
-    ? (result.state as any).files.map((file: any) => ({
+  const loadedState = result.state as Partial<AppState> | undefined
+  state.files = Array.isArray(loadedState?.files)
+    ? loadedState.files!.map((file) => ({
         ...file,
         qty: effectiveFileQty(file),
         _multiSketchDetection:
-          typeof file?._multiSketchDetection === 'boolean' ? file._multiSketchDetection : null,
-        _sketchContourMethod: file?._sketchContourMethod || null
+          typeof file?._multiSketchDetection === 'boolean' ? file._multiSketchDetection : undefined,
+        _sketchContourMethod: file?._sketchContourMethod || undefined
       }))
     : []
-  state.sheets = Array.isArray((result.state as any).sheets) ? (result.state as any).sheets : []
+  state.sheets = Array.isArray(loadedState?.sheets) ? loadedState.sheets! : []
   return state.files.length > 0 || state.sheets.length > 0
 }
 
-export function createAppStore() {
+export function createAppStore(): { state: AppState } {
   return {
-    state,
-    snapshotJobState,
-    persistJobStateNow,
-    schedulePersistJobState,
-    hydrateJobState
+    state
   }
 }

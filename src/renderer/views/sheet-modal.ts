@@ -1,11 +1,40 @@
+import type { AppState } from '../state/store'
+import type { NestSheet } from '../../types/dxf-types'
+
 import { uid } from '../helpers'
 
-export function createSheetModal(deps: {
-  state: any
-  dom: any
+interface SheetModalDOMRefs {
+  sheetModal: HTMLElement
+  sheetWidthMode: HTMLSelectElement & { _syncCustomSelect?: () => void }
+  sheetWidth: HTMLInputElement
+  sheetHeight: HTMLInputElement
+  sheetMaterial: HTMLInputElement
+  confirmSheet: HTMLButtonElement
+  closeSheet: HTMLButtonElement | null
+  cancelSheet: HTMLButtonElement | null
+  sheetModeHelp: HTMLElement
+  [key: string]: unknown
+}
+export interface SheetModalDeps {
+  state: AppState
+  dom: SheetModalDOMRefs
   schedulePersistJobState: () => void
   renderSheets: () => void
-}) {
+}
+
+export interface SheetModalApi {
+  openSheetEditor: (sheetId?: string | null) => void
+  closeSheetDialog: () => void
+  updateSheetModeControls: () => void
+  bind: () => void
+}
+
+export function createSheetModal(deps: {
+  state: AppState
+  dom: SheetModalDOMRefs
+  schedulePersistJobState: () => void
+  renderSheets: () => void
+}): SheetModalApi {
   const { state, dom, schedulePersistJobState, renderSheets } = deps
 
   function presetMatches(btn: HTMLElement): boolean {
@@ -17,7 +46,7 @@ export function createSheetModal(deps: {
   }
 
   function syncSheetPresetButtons(): void {
-    document.querySelectorAll('.preset-btn').forEach((btn: any) => {
+    document.querySelectorAll<HTMLElement>('.preset-btn').forEach((btn) => {
       btn.classList.toggle('active', presetMatches(btn))
     })
   }
@@ -25,7 +54,8 @@ export function createSheetModal(deps: {
   function resetSheetForm(): void {
     state.editingSheetId = null
     dom.sheetWidthMode.value = 'fixed'
-    if (typeof dom.sheetWidthMode._syncCustomSelect === 'function') dom.sheetWidthMode._syncCustomSelect()
+    if (typeof dom.sheetWidthMode._syncCustomSelect === 'function')
+      dom.sheetWidthMode._syncCustomSelect()
     dom.sheetHeight.value = '1250'
     dom.sheetWidth.value = '3000'
     dom.sheetMaterial.value = ''
@@ -41,14 +71,15 @@ export function createSheetModal(deps: {
       return
     }
 
-    const sheet = state.sheets.find((entry: any) => entry.id === sheetId)
+    const sheet = state.sheets.find((entry: NestSheet) => entry.id === sheetId)
     if (!sheet) return
 
     state.editingSheetId = sheet.id
     dom.sheetWidthMode.value = sheet.widthMode || 'fixed'
-    if (typeof dom.sheetWidthMode._syncCustomSelect === 'function') dom.sheetWidthMode._syncCustomSelect()
-    dom.sheetHeight.value = sheet.height ?? 1250
-    dom.sheetWidth.value = sheet.width ?? 3000
+    if (typeof dom.sheetWidthMode._syncCustomSelect === 'function')
+      dom.sheetWidthMode._syncCustomSelect()
+    dom.sheetHeight.value = String(sheet.height ?? 1250)
+    dom.sheetWidth.value = String(sheet.width ?? 3000)
     dom.sheetMaterial.value = sheet.material || ''
     dom.confirmSheet.textContent = 'Save Sheet'
     updateSheetModeControls()
@@ -69,9 +100,11 @@ export function createSheetModal(deps: {
     if (unlimited) {
       dom.sheetModeHelp.textContent = 'The strip can continue without a fixed length limit.'
     } else if (mode === 'max') {
-      dom.sheetModeHelp.textContent = 'Length is treated as a maximum. The algorithm may use less length when possible and will automatically calculate the number of sheets needed and their dimensions.'
+      dom.sheetModeHelp.textContent =
+        'Length is treated as a maximum. The algorithm may use less length when possible and will automatically calculate the number of sheets needed and their dimensions.'
     } else {
-      dom.sheetModeHelp.textContent = 'A fixed sheet size will be used. The number of sheets required is calculated automatically.'
+      dom.sheetModeHelp.textContent =
+        'A fixed sheet size will be used. The number of sheets required is calculated automatically.'
     }
 
     syncSheetPresetButtons()
@@ -86,7 +119,7 @@ export function createSheetModal(deps: {
       const material = (dom.sheetMaterial.value || '').trim()
       const widthMode = dom.sheetWidthMode.value || 'fixed'
       if (state.editingSheetId) {
-        const sheet = state.sheets.find((s: any) => s.id === state.editingSheetId)
+        const sheet = state.sheets.find((s: NestSheet) => s.id === state.editingSheetId)
         if (sheet) {
           sheet.width = width
           sheet.height = height
@@ -101,12 +134,13 @@ export function createSheetModal(deps: {
       schedulePersistJobState()
     })
     dom.sheetWidthMode?.addEventListener('change', updateSheetModeControls)
-    document.querySelectorAll('.preset-btn').forEach((btn: any) => {
+    document.querySelectorAll<HTMLElement>('.preset-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         dom.sheetWidthMode.value = 'fixed'
-        if (typeof dom.sheetWidthMode._syncCustomSelect === 'function') dom.sheetWidthMode._syncCustomSelect()
-        dom.sheetWidth.value = btn.dataset.w
-        dom.sheetHeight.value = btn.dataset.h
+        if (typeof dom.sheetWidthMode._syncCustomSelect === 'function')
+          dom.sheetWidthMode._syncCustomSelect()
+        dom.sheetWidth.value = btn.dataset.w!
+        dom.sheetHeight.value = btn.dataset.h!
         updateSheetModeControls()
         syncSheetPresetButtons()
       })
@@ -117,6 +151,6 @@ export function createSheetModal(deps: {
     openSheetEditor,
     closeSheetDialog,
     updateSheetModeControls,
-    bind,
+    bind
   }
 }

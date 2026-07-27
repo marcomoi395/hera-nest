@@ -5,7 +5,7 @@ import {
   engravingLabelText,
   engravingVisualStyle
 } from '../../shared/engraving-layout'
-import type { Point } from '../../types/geometry'
+import type { Point } from '../../types/geometry-types'
 
 // These glyph maps intentionally stay verbose here so the preview/export
 // can use the same predictable geometry instead of depending on browser fonts.
@@ -1565,7 +1565,7 @@ export const LABEL_STROKE_FONT: Record<string, number[][][]> = {
 
 export function buildPreviewLabelSvg(
   text: string,
-  bbox: any,
+  bbox: { w: number; h: number } | null,
   color: string,
   style: string,
   outerPolygon: Point[] | null = null,
@@ -1588,16 +1588,16 @@ export function buildPreviewLabelSvg(
           outerPolygon:
             Array.isArray(outerPolygon) && outerPolygon.length >= 3 ? outerPolygon : fallbackOuter,
           holes
-        }) as any)
+        }) as { chars: string[]; charH: number; charW: number; startX: number; baseY: number })
       : null
   if (!layout) return ''
   const { chars, charH, charW, startX, baseY } = layout
   const parts: string[] = []
 
-  const lineSvg = (a: number[], b: number[], ox: number, width: number, opacity = 0.96) =>
+  const lineSvg = (a: number[], b: number[], ox: number, width: number, opacity = 0.96): string =>
     `<line x1="${f(ox + a[0] * charW)}" y1="${f(baseY + a[1] * charH)}" x2="${f(ox + b[0] * charW)}" y2="${f(baseY + b[1] * charH)}" stroke="${color}" stroke-width="${f(width)}" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}" pointer-events="none"/>`
 
-  const pathSvg = (loop: number[][], ox: number, width: number, opacity = 0.92) => {
+  const pathSvg = (loop: number[][], ox: number, width: number, opacity = 0.92): string => {
     if (!Array.isArray(loop) || loop.length < 2) return ''
     const d =
       loop
@@ -1606,7 +1606,7 @@ export function buildPreviewLabelSvg(
             `${index === 0 ? 'M' : 'L'} ${f(ox + point[0] * charW)} ${f(baseY + point[1] * charH)}`
         )
         .join(' ') + ' Z'
-    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${f(width)}" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}" pointer-events="none"/>`
+    return `<path d="${d}" stroke="${color}" stroke-width="${f(width)}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}" pointer-events="none"/>`
   }
 
   chars.forEach((ch: string, index: number) => {

@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs'
-import type { Point } from '../../types/geometry'
+import type { Point } from '../../types/geometry-types'
 
 interface Transformation {
   rotation?: number
@@ -28,6 +28,7 @@ interface StripData {
 }
 
 interface Strip {
+  index?: number
   json_path?: string
   svg_path?: string
   svg?: string
@@ -52,17 +53,14 @@ function roundCoord(value: number): number {
   return Number(value.toFixed(6))
 }
 
-function transformPoint(
-  point: unknown,
-  rotationDeg: number,
-  translation: unknown
-): Point | null {
+function transformPoint(point: unknown, rotationDeg: number, translation: unknown): Point | null {
   const [tx, ty] = Array.isArray(translation) ? translation : [0, 0]
   const radians = (Number(rotationDeg) || 0) * (Math.PI / 180)
   const cos = Math.cos(radians)
   const sin = Math.sin(radians)
-  const x = Number((point as any)?.[0])
-  const y = Number((point as any)?.[1])
+  const pointArray = Array.isArray(point) ? point : []
+  const x = Number(pointArray[0])
+  const y = Number(pointArray[1])
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
   return {
     x: x * cos - y * sin + tx,
@@ -86,7 +84,7 @@ function polygonMinX(item: Item | undefined, placement: Placement): number {
 
 function shiftSvgText(svgText: string, shiftX: number): string {
   return String(svgText || '').replace(
-    /translate\(\s*([\-\d.]+)(?:[\s,]+([\-\d.]+))\s*\)/g,
+    /translate\(\s*([-\d.]+)(?:[\s,]+([-\d.]+))\s*\)/g,
     (match, xRaw, yRaw) => {
       const x = Number(xRaw)
       const y = Number(yRaw)
