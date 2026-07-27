@@ -212,6 +212,7 @@ export function createDxfShapeStructureService(deps: {
       entity.vertices &&
       entity.vertices.length >= 3
     ) {
+      return entity.closed !== false
     }
     if (entity.type === 'ELLIPSE') {
       const start = entity.startParameter ?? entity.startAngle ?? 0
