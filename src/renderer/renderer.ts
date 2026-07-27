@@ -483,7 +483,17 @@ export async function initializeRenderer(): Promise<void> {
 
   canvasViewApi = createCanvasView({
     state,
-    dom: dom as any,
+    dom: {
+      canvasTabs: dom.canvasTabs ?? undefined,
+      viewport: dom.viewport ?? undefined,
+      svgContainer: dom.svgContainer ?? undefined,
+      nestStats: dom.nestStats ?? undefined,
+      emptyState: dom.emptyState ?? undefined,
+      zoomLabel: dom.zoomLabel ?? undefined,
+      zoomIn: dom.zoomIn ?? undefined,
+      zoomOut: dom.zoomOut ?? undefined,
+      fitView: dom.fitView ?? undefined
+    },
     getCurrentNestingSettings: currentNestingSettings,
     setNestStatsTone,
     syncViewportEmptyState
