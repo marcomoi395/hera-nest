@@ -13,7 +13,7 @@ export interface NestingServiceDeps {
   state: AppState
   dom: NestingServiceDOM
   getCurrentNestingSettings: () => SettingsObject
-  exportPlacementJSON: (stripIndex: number) => void
+  exportPlacementJSON: () => Promise<{ path: string; payload: unknown }>
   setStatus: (status: string) => void
   setNestStatsTone: (tone: string) => void
   showNestResult: (stripIndex: number) => void
@@ -222,13 +222,10 @@ export function createNestingService(deps: NestingServiceDeps): NestingServiceAp
         setRunControlsRunning()
         dom.nestStats.textContent = `Quality run ${index + 1}/${seeds.length} · seed ${seed}`
         dom.nestStats.title = ''
-        const result = await window.electronAPI.runSparrow(
-          payload as SparrowPayload,
-          {
-            ...baseOptions,
-            rngSeed: seed
-          } as any
-        )
+        const result = await window.electronAPI.runSparrow(payload as SparrowPayload, {
+          ...baseOptions,
+          rngSeed: seed
+        })
         if (!result?.success || !result.runId) {
           throw new Error(result?.error || 'Failed to start Sparrow')
         }
@@ -328,7 +325,7 @@ export function createNestingService(deps: NestingServiceDeps): NestingServiceAp
           const result = await window.electronAPI.runSparrow(tailPayload, {
             ...options,
             rngSeed: seed
-          } as any)
+          })
           if (!result?.success || !result.runId) {
             console.warn(
               '[Sparrow] Tail refinement candidate failed:',
@@ -399,10 +396,10 @@ export function createNestingService(deps: NestingServiceDeps): NestingServiceAp
       throw new Error(result?.error || 'Failed to poll Sparrow run')
     }
 
-    if ((result.summary as any)?.strips?.length) {
+    if (result.summary?.strips?.length) {
       const previousCount = state.nestResult?.strips?.length || 0
       const previousIndex = state.activeStripIndex || 0
-      state.nestResult = result.summary as any
+      state.nestResult = result.summary
       if (result.inputPath) state.nestInputPath = result.inputPath
 
       if (previousCount === 0) {
@@ -447,7 +444,7 @@ export function createNestingService(deps: NestingServiceDeps): NestingServiceAp
       dom.startBtn.disabled = false
       dom.stopBtn.disabled = true
       dom.stopBtn.classList.remove('active')
-      return result as any
+      return result
     }
 
     if (result.status === 'failed') {
@@ -468,10 +465,10 @@ export function createNestingService(deps: NestingServiceDeps): NestingServiceAp
       clearInterval(nestInterval!)
       nestInterval = null
       activeSparrowRunId = null
-      return result as any
+      return result
     }
 
-    return result as any
+    return result
   }
 
   // Wires the Start and Stop buttons.
@@ -499,7 +496,7 @@ export function createNestingService(deps: NestingServiceDeps): NestingServiceAp
 
       let exported: { path: string; payload: unknown }
       try {
-        exported = (await (deps.exportPlacementJSON as any)()) as { path: string; payload: unknown }
+        exported = await exportPlacementJSON()
         setNestStatsTone('')
         dom.nestStats.textContent = 'Placement data prepared'
         dom.nestStats.title = exported.path || ''
@@ -569,7 +566,7 @@ export function createNestingService(deps: NestingServiceDeps): NestingServiceAp
 
         const result = await window.electronAPI.runSparrow(
           exported.payload as SparrowPayload,
-          sparrowOptions as any
+          sparrowOptions
         )
 
         if (!result?.success || !result.runId) {

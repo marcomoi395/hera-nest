@@ -63,6 +63,17 @@ export interface SparrowPayload {
 export interface SparrowOptions {
   timeoutMs?: number
   collectArtifacts?: boolean
+  rngSeed?: number
+  globalTime?: number
+  workers?: number
+  earlyTermination?: boolean
+  maxStripLength?: number | null
+  stripMargin?: number
+  minItemSeparation?: number
+  exactCoedge?: boolean
+  align?: string
+  multiStripMode?: string
+  bucketFillWeight?: number | null
 }
 
 export interface SparrowResult {
@@ -76,7 +87,19 @@ export interface SparrowPollResult {
   success: boolean
   status: 'running' | 'completed' | 'failed' | 'timeout' | 'stopped'
   result?: unknown
-  summary?: unknown
+  summary?: {
+    strips?: Array<{
+      placement?: unknown
+      strip_width?: number | null
+      strip_height?: number | null
+      density?: number | null
+      item_count?: number
+      placed_item_counts?: Array<{ item_id: number; count: number }>
+      placed_item_ids?: number[]
+      is_preview?: boolean
+    }>
+    [key: string]: unknown
+  }
   summaryPath?: string | null
   runDir?: string
   exitCode?: number | null
