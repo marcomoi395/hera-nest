@@ -1,5 +1,6 @@
 import type { DxfFile, NestSheet, NestResult } from '../../types/dxf-types'
-import type { SettingsObject, NestPlacementExportItem } from '../../types/settings'
+import type { SettingsObject } from '../../types/settings'
+import type { ExportItem } from '../services/dxf-service'
 import { clonePlain, effectiveFileQty } from '../helpers'
 
 export interface AppState {
@@ -12,7 +13,7 @@ export interface AppState {
   settings: SettingsObject
   editingSheetId: string | null
   activeStripIndex: number
-  lastPlacementExportItems: NestPlacementExportItem[] | null
+  lastPlacementExportItems: Record<string, ExportItem> | null
   nestInputPath: string | null
 }
 

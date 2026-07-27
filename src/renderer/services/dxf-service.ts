@@ -5,18 +5,11 @@ import type {
   DxfLayer,
   DxfShape,
   DxfFile,
-  DxfHole
+  DxfHole,
+  NestSheet
 } from '../../types/dxf-types'
 import type { SettingsObject } from '../../types/settings'
 import type { AppState } from '../state/store'
-
-interface DxfSheet {
-  id: string
-  width: number
-  height: number
-  widthMode?: string
-  material?: string
-}
 
 interface DxfServiceDeps {
   state: AppState
@@ -48,8 +41,7 @@ interface PlacementSheet {
   quantity: string
   material: string
 }
-
-interface ExportItem {
+export interface ExportItem {
   source_file: string
   source_name: string
   source_shape_id: string
@@ -361,16 +353,16 @@ export function createDxfService({
       throw new Error('No exportable shapes available')
     }
 
-    state.lastPlacementExportItems = exportItems as any
+    state.lastPlacementExportItems = exportItems
 
     return {
       name: buildJobName(state.files),
       settings,
       items,
-      sheets: (state.sheets as any).map((sheet: DxfSheet) => ({
+      sheets: state.sheets.map((sheet: NestSheet) => ({
         id: sheet.id,
         width: sheet.widthMode === 'unlimited' ? null : sheet.width,
-        height: sheet.height,
+        height: sheet.height || 0,
         width_mode: sheet.widthMode || 'fixed',
         quantity: 'auto',
         material: sheet.material || ''
