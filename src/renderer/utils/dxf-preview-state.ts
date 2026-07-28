@@ -46,7 +46,7 @@ export function applyPartLabelsToPreviewData(
   data: Record<string, unknown> | null,
   filename: string
 ): Record<string, unknown> | null {
-  if (!(data?.shapes as any)?.length) return data
+  if (!Array.isArray(data?.shapes) || !data.shapes.length) return data
   const labelText = partLabelFromName(filename)
   ;(data!.shapes as Array<Record<string, unknown>>).forEach((shape: Record<string, unknown>) => {
     shape.partLabel = labelText

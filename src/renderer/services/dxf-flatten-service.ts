@@ -328,6 +328,11 @@ export function sampledClosedEntityPolygon(entity: DxfEntity): any {
   }
 }
 
+export interface FlattenService {
+  buildSketchGroups: (entities: DxfEntity[]) => DxfEntity[][]
+  extractPolygonForEntities: (entities: Record<string, unknown>[]) => PolygonResult | null
+}
+
 export function extractPolygonForEntities(
   entities: Record<string, unknown>[]
 ): PolygonResult | null {

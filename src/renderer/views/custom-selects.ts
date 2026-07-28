@@ -172,7 +172,8 @@ export function createModalCustomSelects(): {
     })
 
     select.addEventListener('change', syncTrigger)
-    ;(select as any)._syncCustomSelect = syncTrigger
+    ;(select as HTMLSelectElement & { _syncCustomSelect?: () => void })._syncCustomSelect =
+      syncTrigger
     syncTrigger()
   }
 

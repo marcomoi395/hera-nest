@@ -494,7 +494,6 @@ export async function initializeRenderer(): Promise<void> {
       zoomOut: dom.zoomOut ?? undefined,
       fitView: dom.fitView ?? undefined
     },
-    getCurrentNestingSettings: currentNestingSettings,
     setNestStatsTone,
     syncViewportEmptyState
   })

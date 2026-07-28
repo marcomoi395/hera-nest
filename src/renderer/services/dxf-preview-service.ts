@@ -15,7 +15,7 @@ export function createDxfPreviewService(deps: {
     state: Record<string, unknown>
     fileId: string
     shapes: DxfPreviewShape[]
-    layers: Array<Record<string, unknown>>
+    layers: DxfLayer[]
   }) => void
   parseDXFToShapes: (dxf: Record<string, unknown>, raw: string, settingsInput?: unknown) => unknown
   mockDXFData: (filename: string) => unknown
@@ -74,11 +74,10 @@ export function createDxfPreviewService(deps: {
     .NestDxfShapeDetectionService || { debugDXF: () => {} }) as {
     debugDXF: (...args: unknown[]) => void
   }
-  const { buildSketchGroups, extractPolygonForEntities } = (
-    window as {
-      NestDxfFlattenService?: Record<string, unknown>
-    }
-  ).NestDxfFlattenService || {
+  const typedWindow = window as {
+    NestDxfFlattenService?: import('../services/dxf-flatten-service').FlattenService
+  }
+  const { buildSketchGroups, extractPolygonForEntities } = typedWindow.NestDxfFlattenService || {
     buildSketchGroups: () => [],
     extractPolygonForEntities: () => null
   }
@@ -787,14 +786,13 @@ export function createDxfPreviewService(deps: {
     const fallbackPath = rectPath(width, height)
     const selectionPath = selectionPolygonPath || null
 
-    const holePolygons = (
-      ((shapeRecord.childClosedContours as unknown[] | undefined) || []) as any[]
-    )
-      .map(
-        (contour: Record<string, unknown>) =>
-          (contour.polygonPoints || contour.points || []) as Point[]
-      )
-      .filter((points: Point[]) => Array.isArray(points) && points.length >= 3)
+    const holePolygons = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (((shapeRecord.childClosedContours as unknown[] | undefined) || []) as any[])
+        .map(
+          (contour: Record<string, unknown>) =>
+            (contour.polygonPoints || contour.points || []) as Point[]
+        )
+        .filter((points: Point[]) => Array.isArray(points) && points.length >= 3)
 
     return {
       id: shapeRecord.id || `s_${index}`,
@@ -817,7 +815,9 @@ export function createDxfPreviewService(deps: {
       nestingPolygonBuilderDebug: typedNestingPolygon?.builderDebug || null,
 
       nestingPolygonCandidates: (
-        ((typedNestingPolygon?.rankedCandidates as unknown[] | undefined) || []) as any[]
+        ((typedNestingPolygon?.rankedCandidates as unknown[] | undefined) || []) as Array<
+          Record<string, unknown>
+        >
       )
         .slice(0, 4)
         .map(summarizeNestingCandidateEntry)
@@ -1015,7 +1015,8 @@ export function createDxfPreviewService(deps: {
         )
 
     const shapes = structuredShapes.length
-      ? (structuredShapes as any[])
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (structuredShapes as any[])
           .map((shapeRecord: Record<string, unknown>, index: number) =>
             buildStructuredPreviewShape({
               shapeRecord,
@@ -1143,11 +1144,11 @@ export function createDxfPreviewService(deps: {
   }
 
   function synthesizeEngravingLayerSequence(
-    layers: Array<Record<string, unknown>>,
+    layers: DxfLayer[],
     state: Record<string, unknown>,
     fileId: string,
     settings: unknown
-  ): Array<Record<string, unknown>> {
+  ): DxfLayer[] {
     const targetIndex = engravingLayerIndex(settings)
     const sourceLayers = Array.isArray(layers) ? layers.map((layer) => ({ ...layer })) : []
     if (targetIndex === null) return sourceLayers
@@ -1157,11 +1158,13 @@ export function createDxfPreviewService(deps: {
       ? (FALLBACK_PALETTE as unknown[])[(targetIndex - 1) % (FALLBACK_PALETTE as unknown[]).length]
       : '#4488FF'
     sourceLayers[targetIndex - 1] = {
-      name: (batchTemplate as Record<string, unknown>)?.name || `Layer ${targetIndex}`,
+      name:
+        ((batchTemplate as Record<string, unknown>)?.name as string | undefined) ||
+        `Layer ${targetIndex}`,
       color:
-        (batchTemplate as Record<string, unknown>)?.color ||
+        ((batchTemplate as Record<string, unknown>)?.color as string | undefined) ||
         sourceLayers[targetIndex - 1]?.color ||
-        fallbackColor
+        (fallbackColor as string)
     }
     return sourceLayers.filter(Boolean)
   }
@@ -1196,7 +1199,7 @@ export function createDxfPreviewService(deps: {
         clonePreviewData({
           shapes: file.shapes,
           layers: synthesizeEngravingLayerSequence(
-            (file.layers as Record<string, unknown>[]) || [],
+            (file.layers as DxfLayer[]) || [],
             state,
             fileId,
             settings
@@ -1205,12 +1208,7 @@ export function createDxfPreviewService(deps: {
         filename
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ) as any
-      synthesizeEngravingLayerSequence(
-        (file.layers as Record<string, unknown>[]) || [],
-        state,
-        fileId,
-        settings
-      )
+      synthesizeEngravingLayerSequence((file.layers as DxfLayer[]) || [], state, fileId, settings)
     }
 
     if (!data && file && file.path && (window.api as Record<string, unknown>)?.parseDXF) {
@@ -1223,7 +1221,7 @@ export function createDxfPreviewService(deps: {
             const enriched = {
               ...parsed,
               layers: synthesizeEngravingLayerSequence(
-                ((parsed as Record<string, unknown>).layers as Record<string, unknown>[]) || [],
+                ((parsed as Record<string, unknown>).layers as DxfLayer[]) || [],
                 state,
                 fileId,
                 settings
@@ -1265,7 +1263,7 @@ export function createDxfPreviewService(deps: {
     state: Record<string, unknown>
     fileId: string
     shapes: DxfPreviewShape[]
-    layers: Array<Record<string, unknown>>
+    layers: DxfLayer[]
   }): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const file = (state.files as any[])?.find(

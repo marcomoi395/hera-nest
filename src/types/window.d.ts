@@ -59,8 +59,8 @@ declare global {
     jsts: unknown
     concaveman: (points: Point[], concavity?: number, lengthThreshold?: number) => Point[]
     NestDxfColor: unknown
-    NestDxfGeometry: unknown
-    NestDxfSvg: unknown
+    NestDxfGeometry: typeof import('../renderer/utils/dxf-geometry')
+    NestDxfSvg: typeof import('../renderer/utils/dxf-svg')
     NestDxfLayerService: unknown
     NestDxfExportMetadataService: unknown
     NestDxfEngravingPreviewService: unknown
@@ -69,7 +69,7 @@ declare global {
     NestDxfContourDetectionService: unknown
     NestDxfShapeStructureService: unknown
     NestDxfRasterEnvelopeService: unknown
-    NestDxfFlattenService: unknown
+    NestDxfFlattenService: import('../renderer/services/dxf-flatten-service').FlattenService
     NestDxfContourHelpers: unknown
     NestDxfPreviewState: unknown
     NestResultScoring: unknown

@@ -2,7 +2,7 @@ import type { DxfEntity } from '../../types/dxf-types'
 import type { BoundingBox, ContourPoint } from '../../types/geometry-types'
 
 // Service dependency types
-interface GeometryService {
+export interface GeometryService {
   EPS: number
   TWO_PI: number
   LOOP_TOLERANCE: number
@@ -20,17 +20,17 @@ interface GeometryService {
   polygonSignedArea: (points: ContourPoint[]) => number
 }
 
-interface FlattenService {
+export interface FlattenService {
   buildSketchGroups: (entities: DxfEntity[]) => DxfEntity[][]
   extractPolygonForEntities: (entities: DxfEntity[]) => ExtractedPolygon | null
 }
 
-interface ShapeDetectionService {
+export interface ShapeDetectionService {
   debugDXF?: (phase: string, data: unknown) => void
   buildClosedContoursFromLines?: (entities: DxfEntity[]) => ClosedContour[]
 }
 
-interface RasterEnvelopeService {
+export interface RasterEnvelopeService {
   buildRasterEnvelopes: (
     entities: DxfEntity[],
     options: { strokeRadius?: number; sampleStep?: number; paddingCells?: number }

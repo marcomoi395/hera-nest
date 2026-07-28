@@ -40,11 +40,11 @@ interface LineLoopEdge {
   reversed: boolean
 }
 
-interface GeometryService {
+export interface GeometryService {
   [key: string]: unknown
 }
 
-interface SvgService {
+export interface SvgService {
   f?: (n: number) => string
   pathFromPoints?: (points: Point[], ox: number, originMaxY: number, closed: boolean) => string
   [key: string]: unknown
@@ -446,11 +446,7 @@ export function buildClosedContoursFromLines(entities: DxfEntity[]): Contour[] {
   ]
 }
 
-export function createDxfShapeDetectionService(deps: {
-  geometry: GeometryService
-  svg: SvgService
-  concaveman?: unknown
-}): {
+export interface DxfShapeDetectionService {
   DXF_DEBUG: boolean
   debugDXF: (phase: string, data: unknown) => void
   isClosedEntity: (entity: unknown) => boolean
@@ -470,7 +466,13 @@ export function createDxfShapeDetectionService(deps: {
   estimateAlpha: (points: Point[]) => number
   computeAlphaShape: (points: Point[]) => Point[]
   buildAlphaShapeContours: (entities: DxfEntity[]) => Contour[]
-} {
+}
+
+export function createDxfShapeDetectionService(deps: {
+  geometry: GeometryService
+  svg: SvgService
+  concaveman?: unknown
+}): DxfShapeDetectionService {
   const geometry =
     deps.geometry ||
     ((window as unknown as Record<string, unknown>).NestDxfGeometry as GeometryService)

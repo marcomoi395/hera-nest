@@ -2,7 +2,7 @@
 import type { Point } from '../../types/geometry-types'
 import type { BoundingBox } from '../utils/dxf-geometry'
 
-interface GeometryService {
+export interface GeometryService {
   EPS: number
   unionBBox: (...args: unknown[]) => unknown
   entityBBox: (entity: unknown) => unknown
@@ -17,7 +17,7 @@ interface GeometryService {
   polygonSignedArea: (points: Point[]) => number
 }
 
-interface ShapeDetectionService {
+export interface ShapeDetectionService {
   debugDXF?: (label: string, payload: unknown) => void
 }
 

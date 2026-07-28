@@ -1,21 +1,16 @@
 import { createDxfPreviewService } from '../services/dxf-preview-service'
 import { createDxfPreviewCanvasView, DEFAULT_CANVAS_W } from './dxf-preview-canvas'
 import { createDxfPreviewShapesListView } from './dxf-preview-shapes-list'
+import type { DxfPreviewShape, DxfLayer } from '../../types/dxf-types'
 
 interface PreviewState {
   fileId: string | null
   filename: string
-  shapes: Array<{
-    id: string
-    layer?: string
-    ownerLayers?: string[]
-    visible: boolean
-    qty?: number
-  }>
-  layers: Array<{ name: string; color?: string }>
+  shapes: DxfPreviewShape[]
+  layers: DxfLayer[]
   activeLayer: string | null
   selectedId: string | null
-  positions: unknown[]
+  positions: Array<{ x: number; y: number }>
   zoom: number
   panelVisible: boolean
   canvasWidth: number
@@ -25,7 +20,7 @@ interface WindowWithNestingAPI extends Window {
   getCurrentNestingSettings?: () => unknown
   renderFiles?: () => void
   schedulePersistJobState?: () => void
-  getPartLabelConfig?: (layers: unknown[]) => unknown
+  getPartLabelConfig?: (layers: DxfLayer[]) => unknown
   removeJobFileById?: (fileId: string) => boolean
   openDXFPreview?: (fileId: string) => Promise<void>
   refreshDXFPreview?: () => Promise<void>
@@ -90,8 +85,9 @@ export function createDxfPreviewModal(deps: {
     schedulePersistJobState: () => (window as WindowWithNestingAPI).schedulePersistJobState?.()
   })
 
+  // PreviewState shape is compatible with canvas view requirements at runtime
   const canvasView = createDxfPreviewCanvasView({
-    pv: pv as any,
+    pv,
     getCanvasWrap: () => dom.canvasWrap,
     getLayerConfig: () => {
       const win = window as WindowWithNestingAPI
@@ -112,7 +108,7 @@ export function createDxfPreviewModal(deps: {
   }
 
   const shapesListView = createDxfPreviewShapesListView({
-    pv: pv as any,
+    pv,
     getShapesList: () => dom.shapesList,
     getShapeCount: () => dom.shapeCount,
     getFileMeta: () => dom.fileMeta,
@@ -219,8 +215,8 @@ export function createDxfPreviewModal(deps: {
   }
 
   async function openDXFPreview(fileId: string): Promise<void> {
-    const file = (state.files as any[]).find((f: any) => f.id === fileId)
-    const filename = file?.name || 'Unknown'
+    const file = (state.files as Array<Record<string, unknown>>).find((f) => f.id === fileId)
+    const filename = (file?.name as string | undefined) || 'Unknown'
     pv.fileId = fileId
     pv.filename = filename
     pv.zoom = 1
@@ -245,11 +241,11 @@ export function createDxfPreviewModal(deps: {
 
     const result = await previewService.preparePreviewData({ state, fileId, filename })
     if (!result) return
-    pv.shapes = (result as any).shapes || []
-    pv.layers = (result as any).layers || []
+    pv.shapes = result.shapes || []
+    pv.layers = result.layers || []
     pv.canvasWidth = canvasView.getCanvasWidth()
     pv.positions = canvasView.autoLayout(pv.shapes, pv.canvasWidth)
-    const hint = (result as any).source === 'mock' ? '  · preview' : ''
+    const hint = (result as unknown as { source?: string }).source === 'mock' ? '  · preview' : ''
     if (dom.fileMeta)
       dom.fileMeta.textContent = `${pv.shapes.length} shape${pv.shapes.length !== 1 ? 's' : ''} · ${pv.layers.length} layer${pv.layers.length !== 1 ? 's' : ''}${hint}`
     renderTabs()

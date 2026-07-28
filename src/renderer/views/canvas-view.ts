@@ -1,8 +1,5 @@
-import { formatWidthMeters, partLabelFromName } from '../helpers'
-import { DEFAULT_ENGRAVING_COLOR } from '../../shared/constants'
-import { FALLBACK_PALETTE } from '../services/dxf-layer-service'
+import { formatWidthMeters } from '../helpers'
 import type { AppState } from '../state/store'
-import type { SettingsObject } from '../../types/settings'
 import type { Strip, NestSheet } from '../../types/dxf-types'
 type CanvasViewState = AppState
 interface CanvasViewDOMRefs {
@@ -29,45 +26,16 @@ export interface CanvasViewApi {
 export function createCanvasView(deps: {
   state: CanvasViewState
   dom: CanvasViewDOMRefs
-  getCurrentNestingSettings: () => SettingsObject
   setNestStatsTone: (tone: string) => void
   syncViewportEmptyState: (isEmpty: boolean) => void
 }): CanvasViewApi {
-  const { state, dom, getCurrentNestingSettings, setNestStatsTone, syncViewportEmptyState } = deps
+  const { state, dom, setNestStatsTone, syncViewportEmptyState } = deps
 
   const FIT_INSET_X = 40
   const FIT_INSET_Y = 28
   const SVG_PREVIEW_MARGIN_X = 80
   const SVG_PREVIEW_MARGIN_Y = 24
   let lastRenderedSvg = ''
-
-  function engravingLayerIndex(
-    settings: SettingsObject = getCurrentNestingSettings()
-  ): number | null {
-    const raw = settings?.engravingLayer
-    if (raw === 'off' || raw == null || raw === '') return null
-    const parsed = Number.parseInt(String(raw), 10)
-    return Number.isFinite(parsed) && parsed >= 1 ? parsed : 2
-  }
-
-  function batchLayerAtIndex(index: number): { name?: string; color?: string } | null {
-    if (!Number.isFinite(index) || index < 1) return null
-    for (const file of state.files || []) {
-      const layer = Array.isArray(file?.layers) ? file.layers[index - 1] : null
-      if (layer?.name || layer?.color) return layer
-    }
-    return null
-  }
-
-  function resolveEngravingColor(layers: Array<{ color?: string }> = []): string {
-    const idx = engravingLayerIndex()
-    if (idx !== null && layers[idx - 1]?.color) return layers[idx - 1].color!
-    if (idx !== null && batchLayerAtIndex(idx)?.color) return batchLayerAtIndex(idx)?.color!
-    if (idx !== null && FALLBACK_PALETTE.length)
-      return FALLBACK_PALETTE[(idx - 1) % FALLBACK_PALETTE.length]
-    if (layers[0]?.color) return layers[0].color
-    return DEFAULT_ENGRAVING_COLOR
-  }
 
   function currentSheetConfig(): NestSheet {
     return (state.sheets[0] || {}) as NestSheet
@@ -309,152 +277,6 @@ export function createCanvasView(deps: {
           block: 'nearest'
         })
       })
-    }
-  }
-
-  function generateMockNestSVG(sheetIndex: number): { svg: string; utilization: number } | null {
-    const sheet = state.sheets[sheetIndex]
-    if (!sheet) return null
-
-    const previewWidth = sheet.widthMode === 'unlimited' ? 3000 : sheet.width || 3000
-    const W = 800
-    const H = Math.round((800 * (sheet.height ?? 3000)) / previewWidth)
-    const colors = ['#4f8ef7', '#4fcf8e', '#f7c34f', '#f77f4f', '#cf4ff7', '#4ff7e8']
-    const shapes: Array<{
-      w: number
-      h: number
-      x?: number
-      y?: number
-      type: string
-      name: string
-      color: string
-      id: number
-    }> = []
-    const placed: Array<{ x: number; y: number; w: number; h: number }> = []
-
-    const tryPlace = (
-      shape: { w: number; h: number; x?: number; y?: number },
-      attempts = 60
-    ): boolean => {
-      for (let i = 0; i < attempts; i++) {
-        const x = 20 + Math.random() * (W - shape.w - 40)
-        const y = 20 + Math.random() * (H - shape.h - 40)
-        const overlaps = placed.some(
-          (p) =>
-            x < p.x + p.w + 4 && x + shape.w + 4 > p.x && y < p.y + p.h + 4 && y + shape.h + 4 > p.y
-        )
-        if (!overlaps) {
-          shape.x = x
-          shape.y = y
-          return true
-        }
-      }
-      return false
-    }
-
-    state.files.forEach((f, fi: number) => {
-      for (let q = 0; q < Math.min(f.qty ?? 0, 8); q++) {
-        const type = (fi + q) % 4
-        const scale = 0.7 + Math.random() * 0.6
-        let shape: {
-          w: number
-          h: number
-          type: string
-          name: string
-          color?: string
-          id?: number
-          x?: number
-          y?: number
-        }
-        if (type === 0) shape = { w: 80 * scale, h: 50 * scale, type: 'rect', name: f.name }
-        else if (type === 1) shape = { w: 90 * scale, h: 70 * scale, type: 'L', name: f.name }
-        else if (type === 2) shape = { w: 100 * scale, h: 60 * scale, type: 'notch', name: f.name }
-        else shape = { w: 70 * scale, h: 80 * scale, type: 'T', name: f.name }
-
-        shape.color = colors[fi % colors.length]
-        shape.id = fi
-        if (tryPlace(shape, 80)) {
-          placed.push(shape as { x: number; y: number; w: number; h: number })
-          shapes.push(
-            shape as {
-              w: number
-              h: number
-              x?: number
-              y?: number
-              type: string
-              name: string
-              color: string
-              id: number
-            }
-          )
-        }
-      }
-    })
-
-    const defs = `
-      <defs>
-        <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
-          <path d="M 16 0 L 0 0 0 16" fill="none" stroke="#1a1d2a" stroke-width="0.5"/>
-        </pattern>
-        <filter id="partGlow" x="-6%" y="-6%" width="112%" height="112%">
-          <feGaussianBlur stdDeviation="1.5" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>`
-
-    const shapesSVG = shapes
-      .filter((s) => s.x != null && s.y != null && s.w != null && s.h != null)
-      .map((s) => {
-        const { x, y, w, h, type } = s
-        // After filter, these are guaranteed to exist
-        const _x = x!,
-          _y = y!,
-          _w = w!,
-          _h = h!
-        const fill = '#1a2744'
-        const stroke = '#4f8ef7'
-        const strokeOpacity = '0.75'
-        let path = ''
-
-        if (type === 'rect') {
-          path = `<rect x="${_x.toFixed(1)}" y="${_y.toFixed(1)}" width="${_w.toFixed(1)}" height="${_h.toFixed(1)}" rx="2" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
-        } else if (type === 'L') {
-          const hw = (_w * 0.45).toFixed(1),
-            hh = (_h * 0.45).toFixed(1)
-          path = `<path d="M${_x.toFixed(1)},${_y.toFixed(1)} h${_w.toFixed(1)} v${hh} h${-hw} v${(_h - parseFloat(hh)).toFixed(1)} h${-(_w - parseFloat(hw)).toFixed(1)} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
-        } else if (type === 'notch') {
-          const nw = (_w * 0.25).toFixed(1),
-            nh = (_h * 0.35).toFixed(1)
-          const nx = (_x + _w / 2 - parseFloat(nw) / 2).toFixed(1)
-          path = `<path d="M${_x.toFixed(1)},${_y.toFixed(1)} h${_w.toFixed(1)} v${_h.toFixed(1)} h${-_w.toFixed(1)} Z M${nx},${_y.toFixed(1)} h${nw} v${nh} h${-nw} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" fill-rule="evenodd" filter="url(#partGlow)"/>`
-        } else {
-          const tw = (_w * 0.4).toFixed(1)
-          const stemH = (_h * 0.55).toFixed(1)
-          path = `<path d="M${_x.toFixed(1)},${_y.toFixed(1)} h${_w.toFixed(1)} v${(_h - parseFloat(stemH)).toFixed(1)} h${-(_w / 2 - parseFloat(tw) / 2).toFixed(1)} v${stemH} h${-parseFloat(tw).toFixed(1)} v${-stemH} h${-(_w / 2 - parseFloat(tw) / 2).toFixed(1)} Z" fill="${fill}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="1.2" filter="url(#partGlow)"/>`
-        }
-
-        const labelText = engravingLayerIndex() !== null ? partLabelFromName(s.name) : ''
-        const labelFontSize = Math.max(7, Math.min(_w, _h) * 0.12)
-        const labelStrokeWidth = 0.8
-        const label = labelText
-          ? `<text x="${(_x + _w / 2).toFixed(1)}" y="${(_y + _h / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="${labelFontSize.toFixed(1)}" fill="none" stroke="${resolveEngravingColor()}" stroke-width="${labelStrokeWidth.toFixed(2)}" stroke-linejoin="round" stroke-linecap="round" opacity="0.96" font-family="monospace">${labelText}</text>`
-          : ''
-        return path + label
-      })
-      .join('\n')
-
-    const utilization = Math.round(60 + Math.random() * 25)
-    return {
-      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-        ${defs}
-        <rect width="${W}" height="${H}" fill="#0d0f18"/>
-        <rect x="8" y="8" width="${W - 16}" height="${H - 16}" rx="3" fill="none" stroke="#2e3550" stroke-width="1" stroke-dasharray="6 4"/>
-        ${shapesSVG}
-        <text x="${W / 2}" y="${H - 8}" text-anchor="middle" font-size="9" fill="#3a4566" font-family="monospace">
-          ${sheet.width} × ${sheet.height} mm · Preview · ${utilization}% utilization
-        </text>
-      </svg>`,
-      utilization
     }
   }
 

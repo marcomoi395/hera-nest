@@ -30,6 +30,20 @@ import {
 } from '../services/dxf-engraving-preview-service'
 import { buildSketchGroups, extractPolygonForEntities } from '../services/dxf-flatten-service'
 import { detectContour } from '../services/contour-detection-service'
+import type {
+  GeometryService as ShapeDetectionGeometryService,
+  SvgService
+} from '../services/dxf-shape-detection-service'
+import type {
+  GeometryService as RasterGeometryService,
+  ShapeDetectionService as RasterShapeDetectionService
+} from '../services/dxf-raster-envelope-service'
+import type {
+  GeometryService as StructureGeometryService,
+  FlattenService,
+  ShapeDetectionService as StructureShapeDetectionService,
+  RasterEnvelopeService
+} from '../services/dxf-shape-structure-service'
 import { createDxfShapeDetectionService } from '../services/dxf-shape-detection-service'
 import { createDxfRasterEnvelopeService } from '../services/dxf-raster-envelope-service'
 import { createDxfShapeStructureService } from '../services/dxf-shape-structure-service'
@@ -61,20 +75,23 @@ window.NestDxfFlattenService = { buildSketchGroups, extractPolygonForEntities }
 window.NestDxfContourDetectionService = { detectContour }
 
 console.log('[MAIN.TS] Script loaded, readyState:', document.readyState)
+// Window services are attached at runtime; cast to expected service interfaces
 window.NestDxfShapeDetectionService = createDxfShapeDetectionService({
-  geometry: window.NestDxfGeometry as any,
-  svg: window.NestDxfSvg as any,
+  geometry: window.NestDxfGeometry as unknown as ShapeDetectionGeometryService,
+  svg: window.NestDxfSvg as unknown as SvgService,
   concaveman: window.concaveman
 })
 window.NestDxfRasterEnvelopeService = createDxfRasterEnvelopeService({
-  geometry: window.NestDxfGeometry as any,
-  shapeDetectionService: window.NestDxfShapeDetectionService as any
+  geometry: window.NestDxfGeometry as unknown as RasterGeometryService,
+  shapeDetectionService:
+    window.NestDxfShapeDetectionService as unknown as RasterShapeDetectionService
 })
 window.NestDxfShapeStructureService = createDxfShapeStructureService({
-  geometry: window.NestDxfGeometry as any,
-  flattenService: window.NestDxfFlattenService as any,
-  shapeDetectionService: window.NestDxfShapeDetectionService as any,
-  rasterEnvelopeService: window.NestDxfRasterEnvelopeService as any
+  geometry: window.NestDxfGeometry as unknown as StructureGeometryService,
+  flattenService: window.NestDxfFlattenService as unknown as FlattenService,
+  shapeDetectionService:
+    window.NestDxfShapeDetectionService as unknown as StructureShapeDetectionService,
+  rasterEnvelopeService: window.NestDxfRasterEnvelopeService as unknown as RasterEnvelopeService
 })
 
 console.log('[MAIN.TS] Checking for DOM elements...')

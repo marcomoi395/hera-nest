@@ -1,8 +1,12 @@
 import { f, f1 } from '../utils/dxf-svg'
-import type { DxfPreviewData, DxfLayer } from '../../types/dxf-types'
+import type { DxfPreviewShape, DxfLayer } from '../../types/dxf-types'
 
 export function createDxfPreviewShapesListView(deps: {
-  pv: DxfPreviewData
+  pv: {
+    shapes: DxfPreviewShape[]
+    layers: DxfLayer[]
+    selectedId?: string | null
+  }
   getShapesList: () => HTMLElement | null
   getShapeCount: () => HTMLElement | null
   getFileMeta: () => HTMLElement | null
