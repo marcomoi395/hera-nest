@@ -3,6 +3,7 @@ import { app, ipcMain } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { spawn } from 'child_process'
+import { ensurePathContained } from '../utils/path-security'
 import { cleanupTempArtifacts } from '../utils/temp-retention'
 import { compactLastStripArtifacts } from '../utils/compact-last-strip'
 
@@ -329,7 +330,19 @@ function collectLiveArtifacts(runDir, safeName) {
       .map((strip) => {
         const relativeSvgPath = String(strip.svg_path || '').trim()
         if (!relativeSvgPath) return null
-        const svgPath = path.resolve(liveDir, relativeSvgPath)
+
+        // Security: Prevent path traversal attacks
+        let svgPath: string
+        try {
+          svgPath = ensurePathContained(liveDir, relativeSvgPath)
+        } catch (err) {
+          console.error(
+            `[Security] Path traversal blocked in live artifacts: ${relativeSvgPath}`,
+            err
+          )
+          return null
+        }
+
         if (!fs.existsSync(svgPath)) return null
         const svgText = fs.readFileSync(svgPath, 'utf-8')
         return {
@@ -445,8 +458,29 @@ function collectSparrowArtifacts(runDir, safeName) {
     const mappedSummary = compactLastStripArtifacts({
       ...summary,
       strips: summary.strips.map((strip) => {
-        const svgPath = path.resolve(runDir, strip.svg_path)
-        const jsonPath = path.resolve(runDir, strip.json_path)
+        // Security: Prevent path traversal attacks
+        let svgPath: string
+        let jsonPath: string
+        try {
+          svgPath = ensurePathContained(runDir, strip.svg_path)
+          jsonPath = ensurePathContained(runDir, strip.json_path)
+        } catch (err) {
+          console.error(
+            `[Security] Path traversal blocked in final artifacts: ${strip.svg_path}, ${strip.json_path}`,
+            err
+          )
+          // Return a minimal valid strip on security violation
+          return {
+            ...strip,
+            svg_path: '',
+            json_path: '',
+            svg: '',
+            placed_item_counts: [],
+            placed_item_ids: [],
+            is_preview: false
+          }
+        }
+
         const placedItemCounts = readPlacedItemCounts(jsonPath)
         return {
           ...strip,
